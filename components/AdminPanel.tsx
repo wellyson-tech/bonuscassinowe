@@ -160,7 +160,7 @@ const AdminPanel: React.FC = () => {
       <button
         onClick={() => {
           setErrorMessage(null);
-          setEditingLink({ category: activeAdminTab, type: 'glass', icon: 'auto', title: '', url: '', badge: '' });
+          setEditingLink({ category: activeAdminTab, type: 'glass', icon: 'auto', title: '', description: 'Clique para jogar', url: '', badge: '' });
         }}
         className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-sm mb-12 shadow-2xl hover:scale-[1.01] transition-all active:scale-95"
       >
@@ -254,6 +254,17 @@ const AdminPanel: React.FC = () => {
                     <option value="glass">Vidro</option>
                   </select>
                 </div>
+              </div>
+
+              {/* RESTAURADO: Campo de Descrição */}
+              <div className="space-y-2">
+                <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Descrição / Chamada</label>
+                <input 
+                  className="w-full p-4 rounded-xl text-sm bg-white/5 border border-white/10 text-white outline-none focus:border-yellow-500" 
+                  value={editingLink.description || ''} 
+                  onChange={e => setEditingLink({...editingLink, description: e.target.value})} 
+                  placeholder="Ex: Clique para ganhar 100% de bônus" 
+                />
               </div>
 
               <div className="space-y-2">
