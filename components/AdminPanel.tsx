@@ -38,7 +38,6 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  // Funções de Drag & Drop
   const onDragStart = (index: number) => {
     setDraggedItemIndex(index);
   };
@@ -60,7 +59,6 @@ const AdminPanel: React.FC = () => {
     setDraggedItemIndex(null);
     setLoading(true);
     
-    // Atualizar posições no banco de dados
     try {
       const updates = links.map((link, idx) => ({
         id: link.id,
@@ -71,12 +69,12 @@ const AdminPanel: React.FC = () => {
         icon: link.icon,
         description: link.description,
         badge: link.badge,
+        category: link.category || 'Destaques',
         is_highlighted: link.is_highlighted
       }));
 
       const { error } = await supabase.from('links').upsert(updates);
       if (error) throw error;
-      console.log("Ordem sincronizada!");
     } catch (err) {
       alert("Erro ao salvar nova ordem!");
     } finally {
@@ -98,6 +96,7 @@ const AdminPanel: React.FC = () => {
         type: editingLink.type || 'glass',
         icon: editingLink.icon || 'auto',
         badge: editingLink.badge || '',
+        category: editingLink.category || 'Destaques',
         is_highlighted: !!editingLink.is_highlighted,
       };
 
@@ -129,7 +128,7 @@ const AdminPanel: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('☢️ ATENÇÃO: Deseja realmente remover esta oferta? Esta ação não pode ser desfeita.')) return;
+    if (!confirm('☢️ Deseja realmente remover esta oferta?')) return;
 
     const { error } = await supabase
       .from('links')
@@ -159,170 +158,140 @@ const AdminPanel: React.FC = () => {
         return (
           <img 
             src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
-            className="w-10 h-10 object-contain rounded-lg bg-white/5 p-1.5 shadow-lg"
+            className="w-10 h-10 object-contain rounded-lg bg-white/5 p-1.5 border border-white/10"
             alt="Favicon"
-            onError={(e) => { (e.target as HTMLImageElement).src = 'https://cdn-icons-png.flaticon.com/512/149/149071.png'; }}
           />
         );
       } catch (e) {
-        return <div className="w-8 h-8 text-white/10">{Icons.chip}</div>;
+        return <div className="w-8 h-8 text-white/20">{Icons.slots}</div>;
       }
     }
-    
-    const iconName = link.icon as string;
-    return <div className="w-10 h-10 text-yellow-500 p-1">{Icons[iconName] || Icons.chip}</div>;
+    const iconName = (link.icon || 'slots').toLowerCase();
+    return <div className="w-10 h-10 text-yellow-500 p-1">{Icons[iconName] || Icons.slots}</div>;
   };
 
   return (
     <div className="w-full max-w-5xl mx-auto p-8 bg-[#050505] min-h-screen text-white pb-32">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6 border-b border-white/5 pb-8">
         <div>
-          <h2 className="text-3xl font-black gold-gradient bg-clip-text text-transparent uppercase tracking-tight">
-            Dashboard Estratégico
-          </h2>
-          <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black mt-1">
-            Gestão de Ativos CassinoWE
-          </p>
+          <h2 className="text-3xl font-black text-shimmer uppercase tracking-tight">Painel Master</h2>
+          <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black mt-1">Configuração de Plataformas e Links</p>
         </div>
         <div className="flex items-center gap-4">
-           <button
-            onClick={() => window.open('/', '_blank')}
-            className="px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-[10px] font-black transition-all uppercase tracking-widest"
-          >
-            Ver Site Público
-          </button>
-          <button
-            onClick={handleLogout}
-            className="px-6 py-3 bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white border border-red-600/30 rounded-2xl text-[10px] font-black transition-all uppercase tracking-widest"
-          >
-            Encerrar Painel
-          </button>
+           <button onClick={() => window.open('/', '_blank')} className="px-6 py-3 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase">Ver Site</button>
+           <button onClick={handleLogout} className="px-6 py-3 bg-red-600/10 text-red-500 border border-red-600/30 rounded-2xl text-[10px] font-black uppercase">Sair</button>
         </div>
       </div>
 
-      {!errorStatus && (
-        <div className="space-y-10">
-          <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-2xl mb-8">
-            <p className="text-[10px] text-yellow-500 font-black uppercase tracking-widest flex items-center gap-2">
-              <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
-              Dica: Clique e arraste os cards para mudar a ordem de exibição.
-            </p>
-          </div>
+      <div className="space-y-10">
+        <button
+          onClick={() => setEditingLink({ title: '', url: '', description: '', type: 'glass', icon: 'auto', is_highlighted: false, badge: '', category: 'Destaques' })}
+          className="w-full py-8 gold-gradient text-black font-black rounded-3xl uppercase text-xl hover:brightness-110 transition-all shadow-[0_20px_40px_rgba(212,175,55,0.2)]"
+        >
+          + Cadastrar Nova Plataforma
+        </button>
 
-          <button
-            onClick={() => setEditingLink({ title: '', url: '', description: '', type: 'glass', icon: 'auto', is_highlighted: false, badge: '' })}
-            className="w-full py-8 gold-gradient text-black font-black rounded-3xl shadow-2xl uppercase tracking-tighter text-xl active:scale-[0.98] transition-all cursor-pointer hover:brightness-110"
-          >
-            + Lançar Nova Campanha VIP
-          </button>
-
-          <div className="grid gap-6">
-            {links.length === 0 ? (
-              <div className="text-center py-32 border-2 border-dashed border-white/5 rounded-[2.5rem]">
-                <p className="text-gray-600 font-black uppercase tracking-widest text-xs">O ecossistema está vazio. Inicie sua primeira oferta acima.</p>
-              </div>
-            ) : (
-              links.map((link, index) => (
-                <div
-                  key={link.id}
-                  draggable
-                  onDragStart={() => onDragStart(index)}
-                  onDragOver={(e) => onDragOver(e, index)}
-                  onDragEnd={onDragEnd}
-                  className={`glass-card p-6 rounded-3xl flex flex-col md:flex-row items-center justify-between border border-white/5 shadow-2xl hover:border-yellow-500/20 transition-all group cursor-move ${draggedItemIndex === index ? 'opacity-30 scale-95' : 'opacity-100'}`}
-                >
-                  <div className="flex items-center gap-6 w-full md:w-auto mb-6 md:mb-0 pointer-events-none">
-                    <div className="w-20 h-20 bg-white/5 rounded-2xl flex items-center justify-center overflow-hidden relative border border-white/10">
-                      {renderPreviewIcon(link)}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-3 mb-1">
-                        <h4 className="font-black text-base uppercase tracking-tight">{link.title}</h4>
-                        <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-black uppercase tracking-widest border border-emerald-500/30">
-                          {link.click_count || 0} Acessos
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-gray-500 truncate max-w-[280px] font-mono opacity-60">{link.url}</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-3 w-full md:w-auto">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setEditingLink(link); }}
-                      className="flex-1 md:flex-none px-6 py-4 bg-white/5 hover:bg-white/10 rounded-2xl transition-all cursor-pointer text-[10px] font-black uppercase tracking-widest border border-white/5"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDelete(link.id!); }}
-                      className="flex-1 md:flex-none px-6 py-4 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-2xl transition-all cursor-pointer text-[10px] font-black uppercase tracking-widest border border-red-500/20"
-                    >
-                      Excluir
-                    </button>
-                  </div>
+        <div className="grid gap-6">
+          {links.map((link, index) => (
+            <div
+              key={link.id}
+              draggable
+              onDragStart={() => onDragStart(index)}
+              onDragOver={(e) => onDragOver(e, index)}
+              onDragEnd={onDragEnd}
+              className={`glass-card p-6 rounded-3xl flex flex-col md:flex-row items-center justify-between border border-white/5 cursor-move transition-all ${draggedItemIndex === index ? 'opacity-30 scale-95' : 'opacity-100 hover:border-yellow-500/30'}`}
+            >
+              <div className="flex items-center gap-6 pointer-events-none">
+                <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10">
+                  {renderPreviewIcon(link)}
                 </div>
-              ))
-            )}
-          </div>
+                <div>
+                  <div className="flex items-center gap-3">
+                    <h4 className="font-black text-base uppercase">{link.title}</h4>
+                    <span className="text-[8px] bg-yellow-500 text-black px-2 py-0.5 rounded font-black uppercase">
+                      {link.category || 'Destaques'}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-gray-500 font-mono mt-1">{link.url}</p>
+                </div>
+              </div>
+              <div className="flex gap-3 mt-4 md:mt-0">
+                <button onClick={() => setEditingLink(link)} className="px-6 py-4 bg-white/5 border border-white/5 rounded-2xl text-[10px] font-black uppercase hover:bg-white/10 transition-colors">Editar</button>
+                <button onClick={() => handleDelete(link.id!)} className="px-6 py-4 bg-red-500/10 text-red-500 border border-red-500/10 rounded-2xl text-[10px] font-black uppercase hover:bg-red-500/20 transition-colors">Excluir</button>
+              </div>
+            </div>
+          ))}
         </div>
-      )}
+      </div>
 
       {editingLink && (
         <div className="fixed inset-0 bg-black/98 backdrop-blur-2xl flex items-center justify-center p-6 z-[9999]">
-          <form onSubmit={handleSave} className="bg-[#0c0c0c] border border-white/10 p-10 rounded-[2.5rem] w-full max-w-xl space-y-6 shadow-[0_0_150px_rgba(0,0,0,1)] max-h-[90vh] overflow-y-auto custom-scroll">
+          <form onSubmit={handleSave} className="bg-[#0c0c0c] border border-white/10 p-10 rounded-[2.5rem] w-full max-w-xl space-y-6 max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="flex justify-between items-center mb-4">
-              <div>
-                <h3 className="text-2xl font-black gold-gradient bg-clip-text text-transparent uppercase tracking-tight">Parametrizar Campanha</h3>
-                <p className="text-[8px] text-gray-500 uppercase tracking-widest mt-1">Configurações de Conversão</p>
-              </div>
-              <button type="button" onClick={() => setEditingLink(null)} className="text-gray-600 hover:text-white transition-colors p-3 bg-white/5 rounded-full">✕</button>
+              <h3 className="text-2xl font-black text-shimmer uppercase">Configurar Plataforma</h3>
+              <button type="button" onClick={() => setEditingLink(null)} className="p-3 bg-white/5 rounded-full hover:bg-white/10">✕</button>
             </div>
             
             <div className="grid gap-6">
               <div className="space-y-2">
-                <label className="text-[9px] uppercase font-black text-gray-500 ml-1 tracking-widest">Título da Oferta</label>
-                <input className="w-full p-5 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white" value={editingLink.title || ''} onChange={e => setEditingLink({...editingLink, title: e.target.value})} required />
+                <label className="text-[9px] uppercase font-black text-gray-400 ml-1">Página / Categoria</label>
+                <input className="w-full p-5 rounded-2xl text-sm bg-white/5 border border-white/10 text-white outline-none focus:border-yellow-500" value={editingLink.category || ''} onChange={e => setEditingLink({...editingLink, category: e.target.value})} placeholder="Ex: Cadastro, VIP, Slots" required />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[9px] uppercase font-black text-gray-400 ml-1">Nome da Plataforma</label>
+                <input className="w-full p-5 rounded-2xl text-sm bg-white/5 border border-white/10 text-white outline-none focus:border-yellow-500" value={editingLink.title || ''} onChange={e => setEditingLink({...editingLink, title: e.target.value})} placeholder="Ex: Betano" required />
               </div>
               
               <div className="space-y-2">
-                <label className="text-[9px] uppercase font-black text-gray-500 ml-1 tracking-widest">URL de Redirecionamento</label>
-                <input className="w-full p-5 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white font-mono" value={editingLink.url || ''} onChange={e => setEditingLink({...editingLink, url: e.target.value})} placeholder="https://exemplo.com/bonus" required />
+                <label className="text-[9px] uppercase font-black text-gray-400 ml-1">URL (Link de Afiliado)</label>
+                <input className="w-full p-5 rounded-2xl text-sm bg-white/5 border border-white/10 text-white outline-none focus:border-yellow-500 font-mono" value={editingLink.url || ''} onChange={e => setEditingLink({...editingLink, url: e.target.value})} placeholder="https://..." required />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-[9px] uppercase font-black text-gray-500 ml-1 tracking-widest">Skin Visual</label>
-                  <select className="w-full p-5 rounded-2xl text-[10px] font-black bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white uppercase" value={editingLink.type || 'glass'} onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}>
+                  <label className="text-[9px] uppercase font-black text-gray-400 ml-1">Ícone</label>
+                  <select className="w-full p-5 rounded-2xl text-[10px] font-black bg-white/5 border border-white/10 text-white outline-none focus:border-yellow-500 uppercase" value={editingLink.icon || 'auto'} onChange={e => setEditingLink({...editingLink, icon: e.target.value})}>
+                    <option value="auto">🌐 Automático (Favicon)</option>
+                    <option value="slots">🎰 Slots (777)</option>
+                    <option value="rocket">🚀 Crash / Rocket</option>
+                    <option value="dice">🎲 Games / Dados</option>
+                    <option value="cards">🃏 Poker / Cartas</option>
+                    <option value="trophy">🏆 VIP / Torneio</option>
+                    <option value="money">💰 Saques / Dinheiro</option>
+                    <option value="gift">🎁 Bônus / Presente</option>
+                    <option value="diamond">💎 Diamond / Premium</option>
+                    <option value="fire">🔥 Hot / Fogo</option>
+                    <option value="whatsapp">💬 WhatsApp</option>
+                    <option value="telegram">✈️ Telegram</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[9px] uppercase font-black text-gray-400 ml-1">Estilo do Botão</label>
+                  <select className="w-full p-5 rounded-2xl text-[10px] font-black bg-white/5 border border-white/10 text-white outline-none focus:border-yellow-500 uppercase" value={editingLink.type || 'glass'} onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}>
                     <option value="gold">💎 Dourado Premium</option>
                     <option value="neon-purple">💜 Roxo Neon</option>
                     <option value="neon-green">💚 Verde Neon</option>
-                    <option value="glass">⚪ Vidro Minimalista</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[9px] uppercase font-black text-gray-500 ml-1 tracking-widest">Ativo Gráfico (Ícone)</label>
-                  <select className="w-full p-5 rounded-2xl text-[10px] font-black bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white uppercase" value={editingLink.icon || 'auto'} onChange={e => setEditingLink({...editingLink, icon: e.target.value})}>
-                    <option value="auto">🌐 Automático (Favicon do Site)</option>
-                    {Object.keys(Icons).map(i => <option key={i} value={i}>{i.toUpperCase()} (Manual)</option>)}
+                    <option value="glass">⚪ Vidro Clean</option>
                   </select>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[9px] uppercase font-black text-gray-500 ml-1 tracking-widest">Etiqueta Flash (Badge)</label>
-                <input className="w-full p-5 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white" value={editingLink.badge || ''} onChange={e => setEditingLink({...editingLink, badge: e.target.value})} placeholder="Ex: NOVO, 200%, VIP" />
+                <label className="text-[9px] uppercase font-black text-gray-400 ml-1">Etiqueta (Opcional)</label>
+                <input className="w-full p-5 rounded-2xl text-sm bg-white/5 border border-white/10 text-white outline-none focus:border-yellow-500" value={editingLink.badge || ''} onChange={e => setEditingLink({...editingLink, badge: e.target.value})} placeholder="Ex: PAGANDO MUITO" />
               </div>
               
               <div className="space-y-2">
-                <label className="text-[9px] uppercase font-black text-gray-500 ml-1 tracking-widest">Copywriting (Subtítulo)</label>
-                <textarea className="w-full p-5 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white h-24 resize-none" value={editingLink.description || ''} onChange={e => setEditingLink({...editingLink, description: e.target.value})} />
+                <label className="text-[9px] uppercase font-black text-gray-400 ml-1">Descrição Curta</label>
+                <textarea className="w-full p-5 rounded-2xl text-sm bg-white/5 border border-white/10 text-white outline-none focus:border-yellow-500 h-24 resize-none" value={editingLink.description || ''} onChange={e => setEditingLink({...editingLink, description: e.target.value})} placeholder="Ex: Bônus de 100% no primeiro depósito" />
               </div>
             </div>
 
-            <div className="flex gap-4 pt-8 border-t border-white/5">
-              <button type="submit" disabled={loading} className="flex-1 py-6 gold-gradient text-black font-black rounded-2xl shadow-2xl uppercase text-xs tracking-widest">
-                {loading ? 'Sincronizando...' : 'Publicar Agora'}
+            <div className="flex gap-4 pt-8">
+              <button type="submit" disabled={loading} className="flex-1 py-6 gold-gradient text-black font-black rounded-2xl uppercase text-xs tracking-widest shadow-lg hover:brightness-110 transition-all">
+                {loading ? 'Sincronizando...' : 'Publicar Alterações'}
               </button>
-              <button type="button" onClick={() => setEditingLink(null)} className="px-10 py-6 bg-white/5 hover:bg-white/10 rounded-2xl text-[10px] font-black uppercase text-gray-400">Cancelar</button>
             </div>
           </form>
         </div>
