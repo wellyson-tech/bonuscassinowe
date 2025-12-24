@@ -72,8 +72,8 @@ const App: React.FC = () => {
       
       if (!error && data) {
         setLinks(data);
-        const cats = Array.from(new Set(data.map(l => l.category || 'Destaques')));
-        if (cats.length > 0 && !activeCategory) {
+        const cats = Array.from(new Set(data.map(l => l.category || 'Página 1')));
+        if (cats.length > 0 && (!activeCategory || !cats.includes(activeCategory))) {
           setActiveCategory(cats[0]);
         }
       }
@@ -93,7 +93,7 @@ const App: React.FC = () => {
       if (data.user?.id === ADMIN_UID) setView('admin');
       else {
         await supabase.auth.signOut();
-        setLoginError('Acesso não autorizado.');
+        setLoginError('Acesso negado: UID sem permissão.');
       }
     } catch (err: any) {
       setLoginError('Credenciais inválidas');
@@ -103,12 +103,12 @@ const App: React.FC = () => {
   };
 
   const categories = useMemo(() => {
-    const cats = links.map(l => l.category || 'Destaques');
+    const cats = links.map(l => l.category || 'Página 1');
     return Array.from(new Set(cats));
   }, [links]);
 
   const filteredLinks = useMemo(() => {
-    return links.filter(l => (l.category || 'Destaques') === activeCategory);
+    return links.filter(l => (l.category || 'Página 1') === activeCategory);
   }, [links, activeCategory]);
 
   const changeCategory = (cat: string) => {
@@ -123,10 +123,9 @@ const App: React.FC = () => {
   const BackgroundElements = () => (
     <>
       <div className="fixed inset-0 bg-[#000] -z-20" />
-      <div className="fixed inset-0 pointer-events-none z-[-15]" style={{ background: `radial-gradient(800px circle at ${mousePos.x}% ${mousePos.y}%, rgba(212, 175, 55, 0.08), transparent 80%)` }} />
+      <div className="fixed inset-0 pointer-events-none z-[-15]" style={{ background: `radial-gradient(800px circle at ${mousePos.x}% ${mousePos.y}%, rgba(212, 175, 55, 0.1), transparent 80%)` }} />
       <div className="scanner-beam" />
-      <div className="energy-blob bg-yellow-600/10" style={{ width: '80vw', height: '80vw', top: '-10%', left: '-10%', '--duration': '15s' } as any} />
-      {[...Array(20)].map((_, i) => (
+      {[...Array(15)].map((_, i) => (
         <div key={i} className="particle" style={{ left: `${Math.random() * 100}%`, '--duration': `${Math.random() * 5 + 5}s`, '--x-offset': `${(Math.random() - 0.5) * 100}px` } as any} />
       ))}
     </>
@@ -137,38 +136,42 @@ const App: React.FC = () => {
 
   if (view === 'login') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-black relative overflow-hidden">
+      <div className="min-h-screen flex items-center justify-center p-6 bg-black relative overflow-hidden font-sans">
         <BackgroundElements />
-        <div className="w-full max-w-sm glass-card p-10 rounded-[3rem] text-center z-10 border border-white/5 animate-fade-in">
-          <h2 className="text-2xl font-black uppercase text-shimmer tracking-tighter mb-8 italic">Painel Master</h2>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl text-white text-sm outline-none focus:border-yellow-500/50" placeholder="E-mail" />
-            <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl text-white text-sm outline-none focus:border-yellow-500/50" placeholder="Senha" />
-            {loginError && <p className="text-[10px] text-red-500 uppercase font-black">{loginError}</p>}
-            <button type="submit" disabled={loginLoading} className="w-full py-4 gold-gradient text-black font-black rounded-2xl uppercase text-[11px] tracking-widest">{loginLoading ? 'Aguarde...' : 'Entrar'}</button>
+        <div className="w-full max-w-sm glass-card p-10 rounded-[3.5rem] text-center z-10 border border-white/10 animate-fade-in shadow-[0_30px_100px_rgba(0,0,0,0.8)]">
+          <header className="mb-10">
+            <h2 className="text-3xl font-black uppercase text-shimmer tracking-tighter italic">Master Login</h2>
+            <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-2">Área Administrativa</p>
+          </header>
+          <form onSubmit={handleLogin} className="space-y-5">
+            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white text-sm outline-none focus:border-yellow-500 transition-all" placeholder="E-mail Administrativo" />
+            <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white text-sm outline-none focus:border-yellow-500 transition-all font-mono" placeholder="Senha Mestra" />
+            {loginError && <p className="text-[10px] text-red-500 uppercase font-black bg-red-500/10 p-3 rounded-xl border border-red-500/20">{loginError}</p>}
+            <button type="submit" disabled={loginLoading} className="w-full py-5 gold-gradient text-black font-black rounded-2xl uppercase text-[11px] tracking-[0.2em] shadow-2xl active:scale-95 transition-transform">{loginLoading ? 'Acessando...' : 'Entrar no Sistema'}</button>
           </form>
+          <button onClick={() => { window.location.hash = ''; setView('public'); }} className="mt-8 text-[10px] text-gray-600 font-black uppercase tracking-widest hover:text-white transition-colors">Voltar ao Site</button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white relative font-sans overflow-x-hidden">
+    <div className="min-h-screen bg-black text-white relative font-sans overflow-x-hidden pb-20">
       <BackgroundElements />
       
       <main className="relative z-10 max-w-lg mx-auto px-6 py-16 flex flex-col items-center">
-        {/* Header Profile */}
-        <header className="text-center mb-10 w-full flex flex-col items-center">
+        {/* Profile Header */}
+        <header className="text-center mb-12 w-full flex flex-col items-center">
           <div className="relative mb-8 group">
-            <div className="absolute inset-0 bg-yellow-500/20 blur-[60px] rounded-full scale-125"></div>
-            <div className="w-28 h-28 p-1 rounded-full bg-gradient-to-br from-yellow-300 via-yellow-600 to-yellow-400 relative animate-float">
-              <img src={BRAND.logoUrl} className="w-full h-full rounded-full object-cover border-[4px] border-black" alt={BRAND.name} />
+            <div className="absolute inset-0 bg-yellow-500/30 blur-[70px] rounded-full scale-110"></div>
+            <div className="w-32 h-32 p-1 rounded-full bg-gradient-to-br from-yellow-200 via-yellow-600 to-yellow-300 relative animate-float shadow-2xl">
+              <img src={BRAND.logoUrl} className="w-full h-full rounded-full object-cover border-[5px] border-black" alt={BRAND.name} />
             </div>
           </div>
           
           <div className="flex flex-col items-center">
-            <div className="flex items-center justify-center gap-2">
-              <h1 className="text-3xl font-black uppercase tracking-tighter text-shimmer italic leading-tight">{BRAND.name}</h1>
+            <div className="flex items-center justify-center gap-3">
+              <h1 className="text-4xl font-black uppercase tracking-tighter text-shimmer italic leading-tight">{BRAND.name}</h1>
               {BRAND.verified && (
                 <div className="ig-verified-wrapper">
                   <svg viewBox="0 0 24 24" className="ig-verified-bg"><path d="M12 2L14.4 4.8L17.7 4.2L18.7 7.5L21.8 8.8L21 12L21.8 15.2L18.7 16.5L17.7 19.8L14.4 19.2L12 22L9.6 19.2L6.3 19.8L5.3 16.5L2.2 15.2L3 12L2.2 8.8L5.3 7.5L6.3 4.2L9.6 4.8L12 2Z" /></svg>
@@ -176,29 +179,27 @@ const App: React.FC = () => {
                 </div>
               )}
             </div>
-            <p className="text-[9px] font-black text-gray-500 uppercase tracking-[0.5em] mt-2">{BRAND.tagline}</p>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.6em] mt-3 opacity-60">{BRAND.tagline}</p>
           </div>
         </header>
 
-        {/* Navigation Pages (Tabs) */}
+        {/* Categories Tab Bar */}
         {categories.length > 0 && (
-          <nav className="w-full mb-10 sticky top-4 z-50">
-            <div className="glass-card p-1.5 rounded-[2rem] flex items-center justify-between border border-white/5 shadow-2xl overflow-hidden relative">
-              {/* Active Background Indicator */}
+          <nav className="w-full mb-12 sticky top-4 z-50 px-2">
+            <div className="glass-card p-2 rounded-[2.5rem] flex items-center justify-between border border-white/5 shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden relative">
               <div 
-                className="absolute h-[calc(100%-12px)] bg-yellow-500 rounded-[1.5rem] transition-all duration-500 ease-out z-0 shadow-[0_0_20px_rgba(212,175,55,0.3)]"
+                className="absolute h-[calc(100%-16px)] bg-yellow-500 rounded-[2rem] transition-all duration-500 ease-out z-0"
                 style={{
                   width: `${100 / categories.length}%`,
                   left: `${(categories.indexOf(activeCategory) * (100 / categories.length))}%`,
-                  margin: '0 6px'
+                  margin: '0 8px'
                 }}
               />
-              
               {categories.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => changeCategory(cat)}
-                  className={`relative z-10 flex-1 py-3.5 text-[10px] font-black uppercase tracking-widest transition-colors duration-500 ${
+                  className={`relative z-10 flex-1 py-4 text-[10px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${
                     activeCategory === cat ? 'text-black' : 'text-gray-500 hover:text-white'
                   }`}
                 >
@@ -209,48 +210,51 @@ const App: React.FC = () => {
           </nav>
         )}
 
-        {/* Links List with Page Transition */}
-        <div className={`w-full space-y-5 mb-20 transition-all duration-300 min-h-[400px] ${isTransitioning ? 'opacity-0 translate-y-4 scale-95' : 'opacity-100 translate-y-0 scale-100'}`}>
+        {/* Content Area */}
+        <div className={`w-full space-y-6 mb-16 transition-all duration-300 min-h-[400px] ${isTransitioning ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
           {filteredLinks.length > 0 ? (
             filteredLinks.map((link, idx) => (
-              <div key={link.id} className="animate-fade-in-up" style={{ animationDelay: `${idx * 0.08}s` }}>
+              <div key={link.id} className="animate-fade-in-up" style={{ animationDelay: `${idx * 0.1}s` }}>
                 <LinkButton link={link} />
               </div>
             ))
           ) : (
-            <div className="text-center py-20 bg-white/[0.02] border border-white/5 rounded-[3rem] opacity-20">
-              <div className="w-12 h-12 mx-auto mb-4">{Icons.slots}</div>
-              <p className="text-[10px] uppercase font-black tracking-[0.5em]">Nesta página ainda não há links</p>
+            <div className="text-center py-32 bg-white/[0.02] border border-dashed border-white/5 rounded-[4rem] opacity-30">
+              <div className="w-16 h-16 mx-auto mb-6 opacity-20">{Icons.slots}</div>
+              <p className="text-[11px] uppercase font-black tracking-[0.5em]">Nenhum bônus nesta aba ainda</p>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <footer className="w-full text-center space-y-10 pb-10">
+        <footer className="w-full text-center space-y-12">
           <div className="flex justify-center gap-6">
             {SOCIAL_LINKS.map((social) => (
-              <a key={social.name} href={social.url} target="_blank" rel="noopener noreferrer" className="w-14 h-14 flex items-center justify-center rounded-2xl bg-white/5 border border-white/5 hover:border-yellow-500/30 text-white transition-all hover:-translate-y-1">
-                <div className="w-6 h-6">{Icons[social.icon] || social.name.charAt(0)}</div>
+              <a key={social.name} href={social.url} target="_blank" rel="noopener noreferrer" className="w-16 h-16 flex items-center justify-center rounded-[2rem] bg-[#111] border border-white/5 hover:border-yellow-500/50 hover:bg-yellow-500/10 text-white transition-all hover:-translate-y-2 shadow-2xl">
+                <div className="w-7 h-7">{Icons[social.icon] || social.name.charAt(0)}</div>
               </a>
             ))}
           </div>
-          <p className="text-[9px] text-gray-600 font-black uppercase tracking-[0.3em]">
-            {BRAND.name} &copy; 2025
-          </p>
+          <div className="flex flex-col items-center gap-4 opacity-30">
+            <div className="w-12 h-[1px] bg-white"></div>
+            <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.4em]">
+              {BRAND.name} &copy; 2025
+            </p>
+          </div>
         </footer>
       </main>
 
       <style>{`
         @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(20px); }
+          from { opacity: 0; transform: translateY(30px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        .animate-fade-in-up { animation: fadeInUp 0.6s ease-out forwards; }
+        .animate-fade-in-up { animation: fadeInUp 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
         @keyframes fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
         }
-        .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
+        .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
       `}</style>
     </div>
   );

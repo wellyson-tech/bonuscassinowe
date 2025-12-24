@@ -17,30 +17,45 @@
         overflow-x: hidden;
       }
 
-      /* Fundo Master Dinâmico */
+      /* Definições de Gradientes e Cores Sólidas */
+      .gold-gradient {
+        background: linear-gradient(135deg, #fceabb 0%, #fccd4d 50%, #f8b500 51%, #fbdf93 100%) !important;
+        color: black !important;
+      }
+
+      .neon-purple-btn {
+        background: #1a1a1a;
+        border: 2px solid #a855f7;
+        box-shadow: 0 0 15px rgba(168, 85, 247, 0.3);
+      }
+
+      .neon-green-btn {
+        background: #1a1a1a;
+        border: 2px solid #10b981;
+        box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+      }
+
       .bg-main {
         background: #000;
         min-height: 100vh;
         position: relative;
       }
 
-      /* Verificado Instagram Oficial - Tamanho Proporcional */
+      /* Verificado Instagram */
       .ig-verified-wrapper {
         display: inline-flex;
         align-items: center;
         justify-content: center;
         position: relative;
-        width: 24px; /* Ajustado para 24px para combinar com text-4xl */
+        width: 24px;
         height: 24px;
         flex-shrink: 0;
-        margin-top: 2px;
       }
 
       .ig-verified-bg {
         position: absolute;
         inset: 0;
         fill: #0095f6;
-        filter: drop-shadow(0 0 6px rgba(0, 149, 246, 0.5));
       }
 
       .ig-verified-check {
@@ -51,120 +66,50 @@
         fill: white;
       }
 
-      /* Efeito de Brilho no Texto (Shimmer) */
+      /* Efeito de Brilho no Texto */
       .text-shimmer {
-        background: linear-gradient(
-          to right,
-          #d4af37 20%,
-          #fff4d6 40%,
-          #fff4d6 60%,
-          #d4af37 80%
-        );
+        background: linear-gradient(to right, #d4af37 20%, #fff4d6 40%, #fff4d6 60%, #d4af37 80%);
         background-size: 200% auto;
         color: transparent;
         -webkit-background-clip: text;
         background-clip: text;
         animation: shine 3s linear infinite;
-        display: inline-block;
       }
 
       @keyframes shine {
         to { background-position: 200% center; }
       }
 
-      /* Scanner Beam de Luxo */
+      /* Scanner Beam */
       .scanner-beam {
         position: fixed;
         top: 0; left: -150%; width: 120%; height: 100%;
-        background: linear-gradient(
-          110deg, 
-          transparent, 
-          rgba(212, 175, 55, 0.01) 40%, 
-          rgba(212, 175, 55, 0.08) 50%, 
-          rgba(212, 175, 55, 0.01) 60%, 
-          transparent
-        );
-        transform: skewX(-15deg);
+        background: linear-gradient(110deg, transparent, rgba(212, 175, 55, 0.05) 50%, transparent);
         animation: scan 8s infinite ease-in-out;
         pointer-events: none;
         z-index: 1;
       }
 
       @keyframes scan {
-        0% { transform: translateX(-100%) skewX(-15deg); opacity: 0; }
-        15% { opacity: 1; }
-        85% { opacity: 1; }
-        100% { transform: translateX(200%) skewX(-15deg); opacity: 0; }
+        0% { transform: translateX(-100%) skewX(-15deg); }
+        100% { transform: translateX(200%) skewX(-15deg); }
       }
 
-      /* Partículas Magnéticas Ascendentes */
-      .particle {
-        position: fixed;
-        background: #d4af37;
-        border-radius: 50%;
-        pointer-events: none;
-        z-index: 1;
-        opacity: 0;
-        animation: particle-rise var(--duration) infinite linear;
-      }
-
-      @keyframes particle-rise {
-        0% { transform: translate(0, 100vh) scale(0); opacity: 0; }
-        10% { opacity: 0.4; }
-        90% { opacity: 0.4; }
-        100% { transform: translate(var(--x-offset), -20vh) scale(1.2); opacity: 0; }
-      }
-
-      /* Brilhos Aleatórios (Sparkles) */
-      .sparkle {
-        position: fixed;
-        width: 2px; height: 2px;
-        background: white;
-        border-radius: 50%;
-        box-shadow: 0 0 10px 2px white;
-        animation: sparkle-anim var(--duration) infinite ease-in-out;
-        z-index: 1;
-        pointer-events: none;
-      }
-
-      @keyframes sparkle-anim {
-        0%, 100% { opacity: 0; transform: scale(0); }
-        50% { opacity: 0.8; transform: scale(1.5); }
-      }
-
-      /* Energia de Fundo (Blobs) */
-      .energy-blob {
-        position: fixed;
-        border-radius: 50%;
-        filter: blur(140px);
-        z-index: 0;
-        pointer-events: none;
-        opacity: 0.1;
-        animation: pulse-energy var(--duration) infinite alternate ease-in-out;
-      }
-
-      @keyframes pulse-energy {
-        0% { transform: scale(1) translate(0, 0); opacity: 0.05; }
-        100% { transform: scale(1.4) translate(var(--move-x), var(--move-y)); opacity: 0.12; }
-      }
-
-      /* Glassmorphism Refinado */
+      /* Glassmorphism */
       .glass-card {
-        background: rgba(12, 12, 12, 0.4);
-        backdrop-filter: blur(25px) saturate(160%);
-        border: 1px solid rgba(255, 255, 255, 0.03);
+        background: rgba(20, 20, 20, 0.8);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
       }
 
       .no-scrollbar::-webkit-scrollbar { display: none; }
       .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
       @keyframes float {
-        0%, 100% { transform: translateY(0) rotate(0deg); }
-        50% { transform: translateY(-15px) rotate(1deg); }
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
       }
       .animate-float { animation: float 5s infinite ease-in-out; }
-
-      ::selection { background: #d4af37; color: black; }
     </style>
     <script type="importmap">
     {
