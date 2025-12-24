@@ -10,18 +10,24 @@ interface Props {
 }
 
 const LinkButton: React.FC<Props> = ({ link, isAdminView = false }) => {
-  const handleLinkClick = async () => {
+  const handleLinkClick = async (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (isAdminView) return;
+    
+    // Previne a navegação imediata para dar tempo ao banco de dados
+    e.preventDefault();
+    const targetUrl = link.url;
 
     try {
-      const { error } = await supabase
+      // Tenta atualizar o contador no banco
+      await supabase
         .from('links')
         .update({ click_count: (link.click_count || 0) + 1 })
         .eq('id', link.id);
-      
-      if (error) console.error("Erro ao registrar clique:", error);
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error("Erro ao registrar clique:", err);
+    } finally {
+      // Abre o link em uma nova aba após a tentativa de salvamento
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -81,8 +87,6 @@ const LinkButton: React.FC<Props> = ({ link, isAdminView = false }) => {
   return (
     <a
       href={link.url}
-      target="_blank"
-      rel="noopener noreferrer"
       onClick={handleLinkClick}
       className={`relative w-full p-5 rounded-[2.2rem] flex items-center gap-5 group overflow-hidden border-b-[6px] ${getStyleClasses()}`}
     >

@@ -8,6 +8,7 @@ const AdminPanel: React.FC = () => {
   const [links, setLinks] = useState<CasinoLink[]>([]);
   const [editingLink, setEditingLink] = useState<Partial<CasinoLink> | null>(null);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeAdminTab, setActiveAdminTab] = useState<string>('');
 
@@ -16,6 +17,7 @@ const AdminPanel: React.FC = () => {
   }, []);
 
   const fetchLinks = async () => {
+    setRefreshing(true);
     try {
       const { data, error } = await supabase
         .from('links')
@@ -26,7 +28,6 @@ const AdminPanel: React.FC = () => {
       const fetchedLinks = data ?? [];
       setLinks(fetchedLinks);
 
-      // Define a primeira aba disponível como ativa se não houver uma
       if (fetchedLinks.length > 0 && !activeAdminTab) {
         const cats = Array.from(new Set(fetchedLinks.map(l => l.category || 'Página 1')));
         setActiveAdminTab(cats[0]);
@@ -35,17 +36,17 @@ const AdminPanel: React.FC = () => {
       }
     } catch (err) {
       console.error("Erro ao buscar links:", err);
+    } finally {
+      setRefreshing(false);
     }
   };
 
-  // Pega todas as categorias únicas existentes
   const categories = useMemo(() => {
     const cats = links.map(l => l.category || 'Página 1');
     const unique = Array.from(new Set(cats));
     return unique.length > 0 ? unique : ['Página 1'];
   }, [links]);
 
-  // Filtra os links para mostrar apenas os da aba selecionada no Admin
   const filteredLinks = useMemo(() => {
     return links.filter(l => (l.category || 'Página 1') === activeAdminTab);
   }, [links, activeAdminTab]);
@@ -106,14 +107,24 @@ const AdminPanel: React.FC = () => {
       <div className="flex justify-between items-center mb-8 border-b border-white/5 pb-6">
         <div>
           <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter">Gestão Master</h2>
-          <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black mt-1">Organização por Páginas</p>
+          <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black mt-1">Monitoramento em Tempo Real</p>
         </div>
-        <button 
-          onClick={() => { supabase.auth.signOut(); window.location.hash = ''; window.location.reload(); }} 
-          className="px-5 py-2.5 bg-white/5 text-gray-400 border border-white/10 rounded-xl text-[9px] font-black uppercase hover:bg-red-600 hover:text-white transition-all"
-        >
-          Sair
-        </button>
+        <div className="flex gap-3">
+          <button 
+            onClick={fetchLinks}
+            disabled={refreshing}
+            className={`px-4 py-2 bg-blue-600/10 text-blue-400 border border-blue-600/20 rounded-xl text-[9px] font-black uppercase flex items-center gap-2 hover:bg-blue-600 hover:text-white transition-all ${refreshing ? 'animate-pulse opacity-50' : ''}`}
+          >
+            <svg className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            {refreshing ? 'Atualizando...' : 'Atualizar Cliques'}
+          </button>
+          <button 
+            onClick={() => { supabase.auth.signOut(); window.location.hash = ''; window.location.reload(); }} 
+            className="px-5 py-2 bg-white/5 text-gray-400 border border-white/10 rounded-xl text-[9px] font-black uppercase hover:bg-red-600 hover:text-white transition-all"
+          >
+            Sair
+          </button>
+        </div>
       </div>
 
       {/* Seletor de Abas no Admin */}
@@ -177,14 +188,14 @@ const AdminPanel: React.FC = () => {
                 <div>
                   <h4 className="font-black text-sm uppercase text-white tracking-tight">{link.title}</h4>
                   <div className="flex items-center gap-2 mt-2 flex-wrap">
-                    {/* RESTAURADO: Contador de Cliques */}
-                    <span className="text-[8px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/10 uppercase font-black">
-                      🖱️ {link.click_count || 0} Cliques
+                    {/* Contador de Cliques com destaque */}
+                    <span className="text-[9px] bg-blue-500 text-white px-3 py-1 rounded-lg shadow-[0_5px_15px_rgba(59,130,246,0.3)] uppercase font-black">
+                      🖱️ {link.click_count || 0} CLIQUES
                     </span>
-                    <span className="text-[8px] bg-white/5 text-gray-500 px-2 py-0.5 rounded uppercase font-black">
+                    <span className="text-[8px] bg-white/5 text-gray-500 px-2 py-1 rounded uppercase font-black border border-white/5">
                       Estilo: {link.type}
                     </span>
-                    {link.badge && <span className="text-[8px] text-yellow-500 font-black">● {link.badge}</span>}
+                    {link.badge && <span className="text-[8px] text-yellow-500 font-black px-1">● {link.badge}</span>}
                   </div>
                 </div>
               </div>
