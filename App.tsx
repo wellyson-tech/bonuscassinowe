@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from './lib/supabase';
-import { BRAND, SOCIAL_LINKS } from './constants';
+import { BRAND, SOCIAL_LINKS, ADMIN_UID } from './constants';
 import LinkButton from './components/LinkButton';
 import AdminPanel from './components/AdminPanel';
 import { CasinoLink } from './types';
@@ -16,16 +16,31 @@ const App: React.FC = () => {
   const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
+    // Lógica de Roteamento Simples via URL
+    const checkPath = () => {
+      const path = window.location.pathname;
+      const hash = window.location.hash;
+      if (path === '/admin-secret' || hash === '#/admin-secret') {
+        setView('login');
+      }
+    };
+
     const initApp = async () => {
       try {
+        checkPath();
         const { data: { session: currentSession } } = await supabase.auth.getSession();
-        setSession(currentSession);
-        // Se já tiver sessão, pula para o admin se solicitado ou mantém public
+        
         if (currentSession) {
-          await fetchLinks();
-        } else {
-          await fetchLinks();
+          if (currentSession.user.id === ADMIN_UID) {
+            setSession(currentSession);
+            setView('admin');
+          } else {
+            // Se o usuário logado não for o ADMIN_UID, desloga
+            await supabase.auth.signOut();
+            setSession(null);
+          }
         }
+        await fetchLinks();
       } catch (e) {
         console.error("Erro na inicialização:", e);
       } finally {
@@ -36,8 +51,19 @@ const App: React.FC = () => {
     initApp();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (!session) setView('public');
+      if (session && session.user.id === ADMIN_UID) {
+        setSession(session);
+        setView('admin');
+      } else if (session) {
+        // Bloqueio de outros usuários
+        supabase.auth.signOut();
+        alert("Acesso negado. Apenas o administrador mestre pode entrar.");
+      } else {
+        setSession(null);
+        if (window.location.pathname !== '/admin-secret' && window.location.hash !== '#/admin-secret') {
+          setView('public');
+        }
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -54,7 +80,7 @@ const App: React.FC = () => {
         setLinks(data);
       }
     } catch (e) {
-      console.warn("Tabela links pode não existir ainda.");
+      console.warn("Tabela links não encontrada ou sem acesso.");
     }
   };
 
@@ -64,10 +90,16 @@ const App: React.FC = () => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      
+      if (data.user?.id !== ADMIN_UID) {
+        throw new Error("Este UID não possui permissões administrativas.");
+      }
+
       setSession(data.session);
       setView('admin');
     } catch (error: any) {
-      alert('Erro ao entrar: ' + error.message);
+      alert('Falha na Autenticação: ' + error.message);
+      await supabase.auth.signOut();
     } finally {
       setLoading(false);
     }
@@ -81,41 +113,41 @@ const App: React.FC = () => {
     );
   }
 
-  // Se houver sessão, sempre prioriza mostrar o Admin se o usuário não quiser ver o site público
-  if (session && (view === 'admin' || view === 'login')) {
+  if (view === 'admin' && session?.user?.id === ADMIN_UID) {
     return <AdminPanel />;
   }
 
-  if (view === 'login' && !session) {
+  if (view === 'login') {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-[#050505]">
-        <form onSubmit={handleLogin} className="w-full max-w-sm glass-card p-8 rounded-2xl space-y-6 border border-white/5 shadow-2xl">
+        <div className="absolute inset-0 bg-yellow-500/5 blur-[150px] pointer-events-none" />
+        <form onSubmit={handleLogin} className="w-full max-w-sm glass-card p-10 rounded-3xl space-y-8 border border-white/10 shadow-2xl relative z-10">
           <div className="text-center">
-            <h2 className="font-display text-2xl font-bold gold-gradient bg-clip-text text-transparent uppercase tracking-tighter">Acesso Restrito</h2>
-            <p className="text-gray-500 text-[10px] uppercase tracking-widest mt-1">Portal do Administrador</p>
+            <h2 className="font-display text-3xl font-bold gold-gradient bg-clip-text text-transparent uppercase tracking-tight">Portal Mestre</h2>
+            <p className="text-gray-500 text-[10px] uppercase tracking-[0.4em] mt-2 font-black opacity-50">Identificação Necessária</p>
           </div>
           <div className="space-y-4">
             <input 
               type="email" 
-              placeholder="Seu E-mail" 
-              className="w-full p-4 rounded-xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 transition-colors"
+              placeholder="E-mail Administrativo" 
+              className="w-full p-4 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 transition-all placeholder:text-gray-600"
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
             />
             <input 
               type="password" 
-              placeholder="Sua Senha" 
-              className="w-full p-4 rounded-xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 transition-colors"
+              placeholder="Chave de Acesso" 
+              className="w-full p-4 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 transition-all placeholder:text-gray-600"
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
             />
           </div>
-          <button type="submit" disabled={loading} className="w-full py-4 gold-gradient text-black font-black rounded-xl hover:brightness-110 active:scale-95 transition-all">
-            {loading ? 'AUTENTICANDO...' : 'ENTRAR AGORA'}
+          <button type="submit" disabled={loading} className="w-full py-5 gold-gradient text-black font-black rounded-2xl hover:brightness-110 active:scale-95 transition-all shadow-lg uppercase tracking-widest text-xs">
+            {loading ? 'Validando...' : 'Desbloquear Sistema'}
           </button>
-          <button type="button" onClick={() => setView('public')} className="w-full text-[10px] text-gray-500 hover:text-white uppercase font-bold tracking-widest transition-colors">Voltar para o Site</button>
+          <button type="button" onClick={() => { window.location.href = "/"; setView('public'); }} className="w-full text-[10px] text-gray-600 hover:text-white uppercase font-bold tracking-widest transition-colors">Abortar e Voltar</button>
         </form>
       </div>
     );
@@ -131,7 +163,7 @@ const App: React.FC = () => {
 
       <main className="relative z-10 w-full max-w-md px-6 py-12 flex flex-col items-center">
         <header className="text-center mb-12 w-full">
-          <div onClick={() => setView('login')} className="relative inline-block mb-6 cursor-pointer group">
+          <div className="relative inline-block mb-6 group">
             <div className="absolute inset-0 bg-yellow-500/10 blur-3xl rounded-full group-hover:bg-yellow-500/20 transition-colors" />
             <div className="relative p-1 rounded-full gold-gradient animate-float">
               <img src={BRAND.logoUrl} alt={BRAND.name} className="w-28 h-28 rounded-full border-4 border-[#050505] object-cover shadow-2xl" />
@@ -146,7 +178,7 @@ const App: React.FC = () => {
             links.map((link) => <LinkButton key={link.id} link={link} />)
           ) : (
             <div className="text-center py-24 glass-card rounded-3xl border-dashed border-white/10">
-              <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold">Aguardando atualização de ofertas...</p>
+              <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold">Buscando as melhores ofertas...</p>
             </div>
           )}
         </section>
@@ -170,7 +202,7 @@ const App: React.FC = () => {
           <span>&copy; {new Date().getFullYear()} {BRAND.name}</span>
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
-            <span>Servidor Seguro</span>
+            <span>Encriptação Ativa</span>
           </div>
         </div>
       </footer>

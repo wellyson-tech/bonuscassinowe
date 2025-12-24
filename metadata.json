@@ -1,5 +1,6 @@
+
 {
-  "name": "Bonus CassinoWE",
-  "description": "Um site premium de links para iGaming e cassino, com estética de luxo em modo escuro, acentos neon e botões de oferta interativos.",
+  "name": "Bonus CassinoWE Master",
+  "description": "Plataforma avançada de BioLink para iGaming com acesso administrativo via /admin-secret e proteção por UID proprietário do Supabase.",
   "requestFramePermissions": []
 }

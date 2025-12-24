@@ -2,6 +2,9 @@
 import React from 'react';
 import { CasinoBrand } from './types';
 
+// Substitua este UID pelo seu UID real do Supabase (encontrado em Authentication -> Users)
+export const ADMIN_UID = "7e748880-e794-4770-967a-18f67e562725"; 
+
 export const BRAND: CasinoBrand = {
   name: "Bônus CassinoWE",
   tagline: "As Melhores Plataformas com bônus estão aqui",
