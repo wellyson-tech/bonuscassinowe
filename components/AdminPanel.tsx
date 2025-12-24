@@ -111,9 +111,27 @@ const AdminPanel: React.FC = () => {
     });
   };
 
+  const renderPreviewIcon = (link: Partial<CasinoLink>) => {
+    if (link.icon === 'auto' || (!Icons[link.icon as string] && link.url?.startsWith('http'))) {
+      try {
+        const url = new URL(link.url || 'http://localhost');
+        return (
+          <img 
+            src={`https://www.google.com/s2/favicons?domain=${url.hostname}&sz=64`}
+            className="w-10 h-10 object-contain"
+            alt="Favicon"
+            onError={(e) => { (e.target as HTMLImageElement).src = 'https://cdn-icons-png.flaticon.com/512/149/149071.png'; }}
+          />
+        );
+      } catch (e) {
+        return Icons.chip;
+      }
+    }
+    return Icons[link.icon as string] || Icons.chip;
+  };
+
   return (
     <div className="w-full max-w-5xl mx-auto p-8 bg-[#050505] min-h-screen text-white pb-32">
-      {/* HEADER DO PAINEL */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6 border-b border-white/5 pb-8">
         <div>
           <h2 className="text-3xl font-black gold-gradient bg-clip-text text-transparent uppercase tracking-tight">
@@ -139,20 +157,6 @@ const AdminPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* SQL HELPER SE TABELA SUMIR */}
-      {errorStatus === 'TABLE_MISSING' && (
-        <div className="mb-12 p-10 bg-red-950/20 border border-red-500/30 rounded-[2rem] shadow-2xl">
-          <h3 className="text-red-500 font-black uppercase text-xl mb-4">Banco de Dados Offline</h3>
-          <p className="text-sm text-gray-400 mb-8 leading-relaxed">A tabela 'links' não foi detectada. Execute o comando SQL no seu dashboard Supabase para restaurar.</p>
-          <button 
-            onClick={() => window.open('https://supabase.com/dashboard/project/ufqhxtfsoxzrofjpvhpk/sql/new', '_blank')}
-            className="px-8 py-4 bg-red-600 text-white rounded-xl font-black uppercase tracking-widest hover:bg-red-500 transition-all shadow-lg text-xs"
-          >
-            Abrir SQL Editor
-          </button>
-        </div>
-      )}
-
       {!errorStatus && (
         <div className="space-y-10">
           <button
@@ -174,14 +178,8 @@ const AdminPanel: React.FC = () => {
                   className="glass-card p-6 rounded-3xl flex flex-col md:flex-row items-center justify-between border border-white/5 shadow-2xl hover:border-yellow-500/20 transition-all group"
                 >
                   <div className="flex items-center gap-6 w-full md:w-auto mb-6 md:mb-0">
-                    <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center text-yellow-500 overflow-hidden relative">
-                      {link.icon === 'auto' ? (
-                         <img 
-                          src={`https://www.google.com/s2/favicons?domain=${new URL(link.url || 'http://localhost').hostname}&sz=64`}
-                          className="w-8 h-8 object-contain opacity-40 group-hover:opacity-100 transition-opacity"
-                          alt="Fav"
-                        />
-                      ) : (Icons[link.icon as keyof typeof Icons] || Icons.chip)}
+                    <div className="w-20 h-20 bg-white/5 rounded-2xl flex items-center justify-center text-yellow-500 overflow-hidden relative">
+                      {renderPreviewIcon(link)}
                     </div>
                     <div>
                       <div className="flex items-center gap-3 mb-1">
@@ -217,7 +215,6 @@ const AdminPanel: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL DE EDIÇÃO AVANÇADA */}
       {editingLink && (
         <div className="fixed inset-0 bg-black/98 backdrop-blur-2xl flex items-center justify-center p-6 z-[9999]">
           <form onSubmit={handleSave} className="bg-[#0c0c0c] border border-white/10 p-10 rounded-[2.5rem] w-full max-w-xl space-y-6 shadow-[0_0_150px_rgba(0,0,0,1)] max-h-[90vh] overflow-y-auto custom-scroll">
@@ -226,46 +223,24 @@ const AdminPanel: React.FC = () => {
                 <h3 className="text-2xl font-black gold-gradient bg-clip-text text-transparent uppercase tracking-tight">Parametrizar Campanha</h3>
                 <p className="text-[8px] text-gray-500 uppercase tracking-widest mt-1">Configurações de Conversão</p>
               </div>
-              <button 
-                type="button" 
-                onClick={() => setEditingLink(null)}
-                className="text-gray-600 hover:text-white transition-colors p-3 bg-white/5 rounded-full"
-              >
-                ✕
-              </button>
+              <button type="button" onClick={() => setEditingLink(null)} className="text-gray-600 hover:text-white transition-colors p-3 bg-white/5 rounded-full">✕</button>
             </div>
             
             <div className="grid gap-6">
               <div className="space-y-2">
                 <label className="text-[9px] uppercase font-black text-gray-500 ml-1 tracking-widest">Título da Oferta</label>
-                <input 
-                  className="w-full p-5 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white transition-all" 
-                  value={editingLink.title || ''} 
-                  onChange={e => setEditingLink({...editingLink, title: e.target.value})} 
-                  required
-                  placeholder="Nome do Cassino/Plataforma"
-                />
+                <input className="w-full p-5 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white" value={editingLink.title || ''} onChange={e => setEditingLink({...editingLink, title: e.target.value})} required />
               </div>
               
               <div className="space-y-2">
                 <label className="text-[9px] uppercase font-black text-gray-500 ml-1 tracking-widest">URL de Redirecionamento</label>
-                <input 
-                  className="w-full p-5 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white transition-all font-mono" 
-                  value={editingLink.url || ''} 
-                  onChange={e => setEditingLink({...editingLink, url: e.target.value})} 
-                  required
-                  placeholder="https://tracker.afiliado..."
-                />
+                <input className="w-full p-5 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white font-mono" value={editingLink.url || ''} onChange={e => setEditingLink({...editingLink, url: e.target.value})} required />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-[9px] uppercase font-black text-gray-500 ml-1 tracking-widest">Skin Visual</label>
-                  <select 
-                    className="w-full p-5 rounded-2xl text-[10px] font-black bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white appearance-none cursor-pointer uppercase" 
-                    value={editingLink.type || 'glass'} 
-                    onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}
-                  >
+                  <select className="w-full p-5 rounded-2xl text-[10px] font-black bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white uppercase" value={editingLink.type || 'glass'} onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}>
                     <option value="gold">💎 Dourado Premium</option>
                     <option value="neon-purple">💜 Roxo Neon</option>
                     <option value="neon-green">💚 Verde Neon</option>
@@ -273,57 +248,34 @@ const AdminPanel: React.FC = () => {
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[9px] uppercase font-black text-gray-500 ml-1 tracking-widest">Ativo Gráfico</label>
-                  <select 
-                    className="w-full p-5 rounded-2xl text-[10px] font-black bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white appearance-none cursor-pointer uppercase" 
-                    value={editingLink.icon || 'auto'} 
-                    onChange={e => setEditingLink({...editingLink, icon: e.target.value})}
-                  >
-                    <option value="auto">🌐 Automático (Favicon)</option>
-                    {Object.keys(Icons).map(i => (
-                      <option key={i} value={i}>{i} (Manual)</option>
-                    ))}
+                  <label className="text-[9px] uppercase font-black text-gray-500 ml-1 tracking-widest">Ativo Gráfico (Ícone)</label>
+                  <select className="w-full p-5 rounded-2xl text-[10px] font-black bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white uppercase" value={editingLink.icon || 'auto'} onChange={e => setEditingLink({...editingLink, icon: e.target.value})}>
+                    <option value="auto">🌐 Automático (Favicon do Site)</option>
+                    {Object.keys(Icons).map(i => <option key={i} value={i}>{i} (Manual)</option>)}
                   </select>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <label className="text-[9px] uppercase font-black text-gray-500 ml-1 tracking-widest">Etiqueta Flash (Badge)</label>
-                <input 
-                  placeholder="EX: PAGANDO MUITO ou BÔNUS 200%"
-                  className="w-full p-5 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white transition-all" 
-                  value={editingLink.badge || ''} 
-                  onChange={e => setEditingLink({...editingLink, badge: e.target.value})} 
-                />
+                <input className="w-full p-5 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white" value={editingLink.badge || ''} onChange={e => setEditingLink({...editingLink, badge: e.target.value})} />
               </div>
               
               <div className="space-y-2">
                 <label className="text-[9px] uppercase font-black text-gray-500 ml-1 tracking-widest">Copywriting (Subtítulo)</label>
-                <textarea 
-                  placeholder="Descreva a oferta em poucas palavras..."
-                  className="w-full p-5 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white transition-all h-24 resize-none" 
-                  value={editingLink.description || ''} 
-                  onChange={e => setEditingLink({...editingLink, description: e.target.value})} 
-                />
+                <textarea className="w-full p-5 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white h-24 resize-none" value={editingLink.description || ''} onChange={e => setEditingLink({...editingLink, description: e.target.value})} />
               </div>
             </div>
 
             <div className="flex gap-4 pt-8 border-t border-white/5">
-              <button type="submit" disabled={loading} className="flex-1 py-6 gold-gradient text-black font-black rounded-2xl shadow-2xl uppercase cursor-pointer hover:brightness-110 active:scale-95 transition-all text-xs tracking-widest">
+              <button type="submit" disabled={loading} className="flex-1 py-6 gold-gradient text-black font-black rounded-2xl shadow-2xl uppercase text-xs tracking-widest">
                 {loading ? 'Sincronizando...' : 'Publicar Agora'}
               </button>
-              <button type="button" onClick={() => setEditingLink(null)} className="px-10 py-6 bg-white/5 hover:bg-white/10 rounded-2xl text-[10px] font-black uppercase transition-all cursor-pointer text-gray-400">
-                Cancelar
-              </button>
+              <button type="button" onClick={() => setEditingLink(null)} className="px-10 py-6 bg-white/5 hover:bg-white/10 rounded-2xl text-[10px] font-black uppercase text-gray-400">Cancelar</button>
             </div>
           </form>
         </div>
       )}
-
-      <style>{`
-        .custom-scroll::-webkit-scrollbar { width: 4px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.2); border-radius: 10px; }
-      `}</style>
     </div>
   );
 };

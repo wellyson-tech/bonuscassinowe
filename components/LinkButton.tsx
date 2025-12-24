@@ -23,18 +23,19 @@ const LinkButton: React.FC<Props> = ({ link }) => {
   };
 
   const renderIcon = () => {
-    // Se for 'auto', tenta pegar o favicon do domínio
+    // Se for 'auto' ou não for um ícone interno, tenta buscar o favicon
     if (link.icon === 'auto' || (!Icons[link.icon] && link.url.startsWith('http'))) {
       try {
         const url = new URL(link.url);
+        // Usando o serviço do Google para buscar favicon de alta qualidade (128px)
         const faviconUrl = `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=128`;
         return (
           <img 
             src={faviconUrl} 
             alt={link.title} 
-            className="w-8 h-8 object-contain rounded-lg shadow-sm"
+            className="w-9 h-9 object-contain rounded-lg"
             onError={(e) => {
-              (e.target as HTMLImageElement).src = 'https://cdn-icons-png.flaticon.com/512/149/149071.png'; // Fallback
+              (e.target as HTMLImageElement).src = 'https://cdn-icons-png.flaticon.com/512/149/149071.png'; // Fallback neutro
             }}
           />
         );
@@ -43,7 +44,7 @@ const LinkButton: React.FC<Props> = ({ link }) => {
       }
     }
 
-    // Se for um ícone pré-definido
+    // Se for um ícone pré-definido (SVG)
     return Icons[link.icon] || Icons.chip;
   };
 
@@ -54,17 +55,14 @@ const LinkButton: React.FC<Props> = ({ link }) => {
       rel="noopener noreferrer"
       className={`relative w-full p-4 rounded-2xl flex items-center gap-4 group overflow-hidden border ${getStyleClasses()}`}
     >
-      {/* Visual background effect for hover */}
       <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
       
-      {/* Icon Section */}
-      <div className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden ${
+      <div className={`flex-shrink-0 w-14 h-14 rounded-xl flex items-center justify-center overflow-hidden ${
         link.type === 'gold' ? 'bg-black/10' : 'bg-white/5'
       }`}>
         {renderIcon()}
       </div>
 
-      {/* Content Section */}
       <div className="flex-grow text-left">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-extrabold uppercase tracking-wider">{link.title}</h3>
@@ -83,7 +81,6 @@ const LinkButton: React.FC<Props> = ({ link }) => {
         </p>
       </div>
 
-      {/* Action Arrow */}
       <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
