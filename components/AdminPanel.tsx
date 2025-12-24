@@ -51,6 +51,40 @@ const AdminPanel: React.FC = () => {
     return links.filter(l => (l.category || 'Página 1') === activeAdminTab);
   }, [links, activeAdminTab]);
 
+  const handleMove = async (index: number, direction: 'up' | 'down') => {
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === filteredLinks.length - 1) return;
+
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    const currentLink = filteredLinks[index];
+    const targetLink = filteredLinks[targetIndex];
+
+    if (!currentLink.id || !targetLink.id) return;
+
+    const currentPos = currentLink.position;
+    const targetPos = targetLink.position;
+
+    // Atualiza localmente para feedback imediato
+    const newLinks = [...links];
+    const idxInLinks = newLinks.findIndex(l => l.id === currentLink.id);
+    const targetIdxInLinks = newLinks.findIndex(l => l.id === targetLink.id);
+    
+    newLinks[idxInLinks].position = targetPos;
+    newLinks[targetIdxInLinks].position = currentPos;
+    
+    setLinks([...newLinks].sort((a, b) => a.position - b.position));
+
+    try {
+      await Promise.all([
+        supabase.from('links').update({ position: targetPos }).eq('id', currentLink.id),
+        supabase.from('links').update({ position: currentPos }).eq('id', targetLink.id)
+      ]);
+    } catch (err) {
+      console.error("Erro ao reordenar:", err);
+      fetchLinks(); // Recarrega se falhar
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingLink) return;
@@ -167,7 +201,7 @@ const AdminPanel: React.FC = () => {
         + Novo Link em "{activeAdminTab}"
       </button>
 
-      {/* Lista Filtrada com Contador de Cliques */}
+      {/* Lista Filtrada com Contador de Cliques e Ordenação */}
       <div className="space-y-4">
         <div className="flex justify-between items-center mb-6 px-2">
           <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em]">Plataformas na {activeAdminTab}</h3>
@@ -179,16 +213,33 @@ const AdminPanel: React.FC = () => {
             <p className="text-gray-600 uppercase text-[9px] font-black tracking-[0.5em]">Sem links cadastrados</p>
           </div>
         ) : (
-          filteredLinks.map((link) => (
+          filteredLinks.map((link, idx) => (
             <div key={link.id} className="bg-[#0f0f0f] p-5 rounded-[2.5rem] flex items-center justify-between border border-white/5 hover:border-white/10 transition-colors">
               <div className="flex items-center gap-5">
+                {/* Botões de Ordenação Lateral */}
+                <div className="flex flex-col gap-1">
+                  <button 
+                    onClick={() => handleMove(idx, 'up')} 
+                    disabled={idx === 0}
+                    className={`p-1.5 rounded-lg border border-white/5 hover:bg-white/10 ${idx === 0 ? 'opacity-20 cursor-not-allowed' : 'text-yellow-500'}`}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 15l7-7 7 7"/></svg>
+                  </button>
+                  <button 
+                    onClick={() => handleMove(idx, 'down')} 
+                    disabled={idx === filteredLinks.length - 1}
+                    className={`p-1.5 rounded-lg border border-white/5 hover:bg-white/10 ${idx === filteredLinks.length - 1 ? 'opacity-20 cursor-not-allowed' : 'text-yellow-500'}`}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7"/></svg>
+                  </button>
+                </div>
+
                 <div className="w-14 h-14 bg-black rounded-2xl flex items-center justify-center border border-white/10 text-yellow-500">
                   {Icons[link.icon || 'slots'] || Icons.slots}
                 </div>
                 <div>
                   <h4 className="font-black text-sm uppercase text-white tracking-tight">{link.title}</h4>
                   <div className="flex items-center gap-2 mt-2 flex-wrap">
-                    {/* Contador de Cliques com destaque */}
                     <span className="text-[9px] bg-blue-500 text-white px-3 py-1 rounded-lg shadow-[0_5px_15px_rgba(59,130,246,0.3)] uppercase font-black">
                       🖱️ {link.click_count || 0} CLIQUES
                     </span>
@@ -247,7 +298,12 @@ const AdminPanel: React.FC = () => {
                 </div>
                 <div className="space-y-2">
                   <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Estilo do Card</label>
-                  <select className="w-full p-4 rounded-xl text-[10px] font-black bg-white/5 border border-white/10 text-white outline-none uppercase" value={editingLink.type || 'glass'} onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}>
+                  <select 
+                    className="w-full p-4 rounded-xl text-[10px] font-black bg-black border border-white/10 text-white outline-none uppercase appearance-none" 
+                    value={editingLink.type || 'glass'} 
+                    onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}
+                    style={{ backgroundColor: '#0a0a0a', color: 'white' }}
+                  >
                     <option value="gold">Dourado</option>
                     <option value="neon-purple">Roxo</option>
                     <option value="neon-green">Verde</option>
@@ -256,7 +312,6 @@ const AdminPanel: React.FC = () => {
                 </div>
               </div>
 
-              {/* RESTAURADO: Campo de Descrição */}
               <div className="space-y-2">
                 <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Descrição / Chamada</label>
                 <input 
@@ -275,7 +330,12 @@ const AdminPanel: React.FC = () => {
               <div className="grid grid-cols-2 gap-5">
                 <div className="space-y-2">
                   <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Ícone</label>
-                  <select className="w-full p-4 rounded-xl text-[10px] font-black bg-white/5 border border-white/10 text-white outline-none uppercase" value={editingLink.icon || 'auto'} onChange={e => setEditingLink({...editingLink, icon: e.target.value})}>
+                  <select 
+                    className="w-full p-4 rounded-xl text-[10px] font-black bg-black border border-white/10 text-white outline-none uppercase appearance-none" 
+                    value={editingLink.icon || 'auto'} 
+                    onChange={e => setEditingLink({...editingLink, icon: e.target.value})}
+                    style={{ backgroundColor: '#0a0a0a', color: 'white' }}
+                  >
                     <option value="auto">🌐 Auto</option>
                     <option value="slots">🎰 Slots</option>
                     <option value="rocket">🚀 Crash</option>
