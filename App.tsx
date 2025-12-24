@@ -14,7 +14,7 @@ const App: React.FC = () => {
   const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
   const [isTransitioning, setIsTransitioning] = useState(false);
   
-  // Estados de Login
+  // Login State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
@@ -26,11 +26,8 @@ const App: React.FC = () => {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (hash === '#/admin-secret') {
-        if (session && session.user.id === ADMIN_UID) {
-          setView('admin');
-        } else {
-          setView('login');
-        }
+        if (session && session.user.id === ADMIN_UID) setView('admin');
+        else setView('login');
       } else {
         setView('public');
       }
@@ -73,8 +70,11 @@ const App: React.FC = () => {
       if (!error && data) {
         setLinks(data);
         const cats = Array.from(new Set(data.map(l => l.category || 'Página 1')));
-        if (cats.length > 0 && (!activeCategory || !cats.includes(activeCategory))) {
-          setActiveCategory(cats[0]);
+        if (cats.length > 0) {
+          // Mantém a categoria ativa se ela ainda existir, senão pega a primeira
+          if (!activeCategory || !cats.includes(activeCategory)) {
+            setActiveCategory(cats[0]);
+          }
         }
       }
     } catch (e) {
@@ -93,7 +93,7 @@ const App: React.FC = () => {
       if (data.user?.id === ADMIN_UID) setView('admin');
       else {
         await supabase.auth.signOut();
-        setLoginError('Acesso negado: UID sem permissão.');
+        setLoginError('Acesso negado: UID não autorizado.');
       }
     } catch (err: any) {
       setLoginError('Credenciais inválidas');
@@ -104,12 +104,14 @@ const App: React.FC = () => {
 
   const categories = useMemo(() => {
     const cats = links.map(l => l.category || 'Página 1');
-    return Array.from(new Set(cats));
+    const uniqueCats = Array.from(new Set(cats));
+    return uniqueCats.length > 0 ? uniqueCats : ['Página 1'];
   }, [links]);
 
   const filteredLinks = useMemo(() => {
-    return links.filter(l => (l.category || 'Página 1') === activeCategory);
-  }, [links, activeCategory]);
+    const targetCat = activeCategory || categories[0];
+    return links.filter(l => (l.category || 'Página 1') === targetCat);
+  }, [links, activeCategory, categories]);
 
   const changeCategory = (cat: string) => {
     if (cat === activeCategory) return;
@@ -122,12 +124,9 @@ const App: React.FC = () => {
 
   const BackgroundElements = () => (
     <>
-      <div className="fixed inset-0 bg-[#000] -z-20" />
+      <div className="fixed inset-0 bg-black -z-20" />
       <div className="fixed inset-0 pointer-events-none z-[-15]" style={{ background: `radial-gradient(800px circle at ${mousePos.x}% ${mousePos.y}%, rgba(212, 175, 55, 0.1), transparent 80%)` }} />
       <div className="scanner-beam" />
-      {[...Array(15)].map((_, i) => (
-        <div key={i} className="particle" style={{ left: `${Math.random() * 100}%`, '--duration': `${Math.random() * 5 + 5}s`, '--x-offset': `${(Math.random() - 0.5) * 100}px` } as any} />
-      ))}
     </>
   );
 
@@ -136,20 +135,16 @@ const App: React.FC = () => {
 
   if (view === 'login') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-black relative overflow-hidden font-sans">
+      <div className="min-h-screen flex items-center justify-center p-6 bg-black relative overflow-hidden">
         <BackgroundElements />
-        <div className="w-full max-w-sm glass-card p-10 rounded-[3.5rem] text-center z-10 border border-white/10 animate-fade-in shadow-[0_30px_100px_rgba(0,0,0,0.8)]">
-          <header className="mb-10">
-            <h2 className="text-3xl font-black uppercase text-shimmer tracking-tighter italic">Master Login</h2>
-            <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-2">Área Administrativa</p>
-          </header>
+        <div className="w-full max-w-sm glass-card p-10 rounded-[3.5rem] text-center z-10 border border-white/10 animate-fade-in shadow-2xl">
+          <h2 className="text-3xl font-black uppercase text-shimmer tracking-tighter italic mb-10">Admin Login</h2>
           <form onSubmit={handleLogin} className="space-y-5">
-            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white text-sm outline-none focus:border-yellow-500 transition-all" placeholder="E-mail Administrativo" />
-            <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white text-sm outline-none focus:border-yellow-500 transition-all font-mono" placeholder="Senha Mestra" />
-            {loginError && <p className="text-[10px] text-red-500 uppercase font-black bg-red-500/10 p-3 rounded-xl border border-red-500/20">{loginError}</p>}
-            <button type="submit" disabled={loginLoading} className="w-full py-5 gold-gradient text-black font-black rounded-2xl uppercase text-[11px] tracking-[0.2em] shadow-2xl active:scale-95 transition-transform">{loginLoading ? 'Acessando...' : 'Entrar no Sistema'}</button>
+            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white text-sm outline-none focus:border-yellow-500" placeholder="E-mail" />
+            <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white text-sm outline-none focus:border-yellow-500 font-mono" placeholder="Senha" />
+            {loginError && <p className="text-[10px] text-red-500 uppercase font-black">{loginError}</p>}
+            <button type="submit" disabled={loginLoading} className="w-full py-5 bg-yellow-500 text-black font-black rounded-2xl uppercase text-[11px] tracking-widest">{loginLoading ? 'Carregando...' : 'Acessar Painel'}</button>
           </form>
-          <button onClick={() => { window.location.hash = ''; setView('public'); }} className="mt-8 text-[10px] text-gray-600 font-black uppercase tracking-widest hover:text-white transition-colors">Voltar ao Site</button>
         </div>
       </div>
     );
@@ -184,14 +179,14 @@ const App: React.FC = () => {
         </header>
 
         {/* Categories Tab Bar */}
-        {categories.length > 0 && (
+        {categories.length > 1 && (
           <nav className="w-full mb-12 sticky top-4 z-50 px-2">
-            <div className="glass-card p-2 rounded-[2.5rem] flex items-center justify-between border border-white/5 shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden relative">
+            <div className="glass-card p-2 rounded-[2.5rem] flex items-center justify-between border border-white/5 shadow-2xl overflow-hidden relative">
               <div 
                 className="absolute h-[calc(100%-16px)] bg-yellow-500 rounded-[2rem] transition-all duration-500 ease-out z-0"
                 style={{
                   width: `${100 / categories.length}%`,
-                  left: `${(categories.indexOf(activeCategory) * (100 / categories.length))}%`,
+                  left: `${(categories.indexOf(activeCategory || categories[0]) * (100 / categories.length))}%`,
                   margin: '0 8px'
                 }}
               />
@@ -199,8 +194,8 @@ const App: React.FC = () => {
                 <button
                   key={cat}
                   onClick={() => changeCategory(cat)}
-                  className={`relative z-10 flex-1 py-4 text-[10px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${
-                    activeCategory === cat ? 'text-black' : 'text-gray-500 hover:text-white'
+                  className={`relative z-10 flex-1 py-4 text-[10px] font-black uppercase tracking-widest transition-colors duration-500 ${
+                    (activeCategory || categories[0]) === cat ? 'text-black' : 'text-gray-500 hover:text-white'
                   }`}
                 >
                   {cat}
@@ -220,8 +215,7 @@ const App: React.FC = () => {
             ))
           ) : (
             <div className="text-center py-32 bg-white/[0.02] border border-dashed border-white/5 rounded-[4rem] opacity-30">
-              <div className="w-16 h-16 mx-auto mb-6 opacity-20">{Icons.slots}</div>
-              <p className="text-[11px] uppercase font-black tracking-[0.5em]">Nenhum bônus nesta aba ainda</p>
+              <p className="text-[11px] uppercase font-black tracking-[0.5em]">Conteúdo em breve</p>
             </div>
           )}
         </div>
@@ -230,17 +224,14 @@ const App: React.FC = () => {
         <footer className="w-full text-center space-y-12">
           <div className="flex justify-center gap-6">
             {SOCIAL_LINKS.map((social) => (
-              <a key={social.name} href={social.url} target="_blank" rel="noopener noreferrer" className="w-16 h-16 flex items-center justify-center rounded-[2rem] bg-[#111] border border-white/5 hover:border-yellow-500/50 hover:bg-yellow-500/10 text-white transition-all hover:-translate-y-2 shadow-2xl">
+              <a key={social.name} href={social.url} target="_blank" rel="noopener noreferrer" className="w-16 h-16 flex items-center justify-center rounded-[2rem] bg-white/5 border border-white/10 hover:border-yellow-500/50 text-white transition-all hover:-translate-y-2">
                 <div className="w-7 h-7">{Icons[social.icon] || social.name.charAt(0)}</div>
               </a>
             ))}
           </div>
-          <div className="flex flex-col items-center gap-4 opacity-30">
-            <div className="w-12 h-[1px] bg-white"></div>
-            <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.4em]">
-              {BRAND.name} &copy; 2025
-            </p>
-          </div>
+          <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.4em]">
+            {BRAND.name} &copy; 2025
+          </p>
         </footer>
       </main>
 
@@ -251,8 +242,8 @@ const App: React.FC = () => {
         }
         .animate-fade-in-up { animation: fadeInUp 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
         @keyframes fade-in {
-          from { opacity: 0; transform: scale(0.95); }
-          to { opacity: 1; transform: scale(1); }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
         .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
       `}</style>
