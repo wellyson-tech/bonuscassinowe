@@ -4,36 +4,36 @@ import { createClient } from '@supabase/supabase-js';
 /**
  * CONFIGURAÇÃO DO SUPABASE
  * 
- * 1. Acesse: https://supabase.com/dashboard
- * 2. Vá em: Settings (Engrenagem) > API
- * 3. Copie o 'Project URL' e a 'anon' public key.
+ * ATENÇÃO:
+ * - Use a chave 'anon' (pública).
+ * - NUNCA use a chave 'service_role' aqui, ou você receberá o erro "Forbidden use of secret API key".
  */
 
-// COLE SUA URL AQUI (Ex: 'https://xyz.supabase.co')
+// 1. Cole aqui a 'Project URL'
 const supabaseUrl = 'https://ufqhxtfsoxzrofjpvhpk.supabase.co'; 
 
-// COLE SUA CHAVE ANON AQUI
-const supabaseAnonKey = 'sb_secret_E7O2C4lt23a-kHKSXhOk2w_YXARpSnF';
+// 2. Cole aqui a chave 'anon' / 'public' (NÃO USE A SERVICE_ROLE!)
+const supabaseAnonKey = 'sb_publishable_pfMYcQnDWH_Gk8uK8ftIMw_suSco3Vt';
 
 /**
- * Validação de segurança para evitar erros de inicialização.
- * Não altere o código abaixo.
+ * Validação automática para ajudar o desenvolvedor
  */
+const isSecretKey = (key: string) => {
+  // Verificação simples: chaves service_role costumam ser identificadas pelo Supabase no erro
+  // mas aqui garantimos que o usuário saiba se esqueceu de trocar o texto.
+  return key.includes('SUA_CHAVE_ANON_AQUI');
+};
+
 const getValidUrl = (url: string) => {
   try {
-    const parsed = new URL(url);
-    // Verifica se o usuário trocou o placeholder padrão
-    if (url.includes('SUA_URL_AQUI')) throw new Error('URL não configurada');
-    return parsed.origin;
+    if (url.includes('SUA_URL_AQUI')) return 'https://placeholder-project.supabase.co';
+    return new URL(url).origin;
   } catch {
-    // Retorna um link temporário para não quebrar a construção do objeto URL
     return 'https://placeholder-project.supabase.co';
   }
 };
 
-const isConfigured = supabaseUrl !== 'SUA_URL_AQUI' && supabaseAnonKey !== 'SUA_CHAVE_ANON_AQUI';
-
 export const supabase = createClient(
   getValidUrl(supabaseUrl),
-  isConfigured ? supabaseAnonKey : 'no-key-provided'
+  isSecretKey(supabaseAnonKey) ? 'invalid-key' : supabaseAnonKey
 );
