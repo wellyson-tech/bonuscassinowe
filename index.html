@@ -34,12 +34,18 @@
       ::-webkit-scrollbar-thumb { background: #d4af37; border-radius: 10px; }
       
       input, select, textarea {
-        background: rgba(255,255,255,0.05) !important;
-        border: 1px solid rgba(255,255,255,0.1) !important;
-        color: white !important;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: white;
         outline: none;
       }
-      input:focus { border-color: #d4af37 !important; }
+      input:focus, select:focus { border-color: #d4af37; }
+      
+      /* Estilo específico para as opções do select para garantir legibilidade em todos os navegadores */
+      select option {
+        background-color: #171717;
+        color: white;
+      }
     </style>
     <script type="importmap">
     {

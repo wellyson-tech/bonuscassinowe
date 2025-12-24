@@ -49,7 +49,7 @@ const AdminPanel: React.FC = () => {
         description: editingLink.description || '',
         url: editingLink.url || '',
         type: editingLink.type || 'glass',
-        icon: editingLink.icon || 'chip',
+        icon: editingLink.icon || 'auto',
         badge: editingLink.badge || '',
         is_highlighted: !!editingLink.is_highlighted,
       };
@@ -103,7 +103,6 @@ const AdminPanel: React.FC = () => {
       window.location.reload();
     } catch (err) {
       console.error("Erro ao sair:", err);
-      // Força o reload se o signOut falhar por algum motivo de rede
       window.location.reload();
     }
   };
@@ -160,7 +159,7 @@ const AdminPanel: React.FC = () => {
                 url: '',
                 description: '',
                 type: 'glass',
-                icon: 'chip',
+                icon: 'auto',
                 is_highlighted: false,
                 badge: '',
               });
@@ -184,8 +183,14 @@ const AdminPanel: React.FC = () => {
                   className="glass-card p-5 rounded-2xl flex items-center justify-between border border-white/5 shadow-xl hover:border-yellow-500/30 transition-all"
                 >
                   <div className="flex items-center gap-5">
-                    <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-yellow-500">
-                      {Icons[link.icon as keyof typeof Icons] || Icons.chip}
+                    <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-yellow-500 overflow-hidden">
+                      {link.icon === 'auto' ? (
+                         <img 
+                          src={`https://www.google.com/s2/favicons?domain=${new URL(link.url || 'http://localhost').hostname}&sz=64`}
+                          className="w-6 h-6 object-contain opacity-50"
+                          alt="Auto"
+                        />
+                      ) : (Icons[link.icon as keyof typeof Icons] || Icons.chip)}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
@@ -193,7 +198,7 @@ const AdminPanel: React.FC = () => {
                           {link.title}
                         </h4>
                         {link.badge && (
-                          <span className="text-[8px] bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded font-black uppercase">
+                          <span className="text-[8px] bg-yellow-500 text-black px-2 py-0.5 rounded font-black uppercase">
                             {link.badge}
                           </span>
                         )}
@@ -226,14 +231,14 @@ const AdminPanel: React.FC = () => {
 
       {/* FORMULÁRIO MODAL */}
       {editingLink && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 z-[9999]">
-          <form onSubmit={handleSave} className="bg-[#0c0c0c] border border-white/10 p-8 rounded-3xl w-full max-w-lg space-y-5 shadow-[0_0_100px_rgba(0,0,0,1)]">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-[9999]">
+          <form onSubmit={handleSave} className="bg-[#0c0c0c] border border-white/10 p-8 rounded-3xl w-full max-w-lg space-y-5 shadow-[0_0_100px_rgba(0,0,0,1)] max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-2">
               <h3 className="text-xl font-black gold-gradient bg-clip-text text-transparent uppercase tracking-tight">Configurar Oferta</h3>
               <button 
                 type="button" 
                 onClick={() => setEditingLink(null)}
-                className="text-gray-500 hover:text-white transition-colors"
+                className="text-gray-500 hover:text-white transition-colors p-2"
               >
                 ✕
               </button>
@@ -241,9 +246,9 @@ const AdminPanel: React.FC = () => {
             
             <div className="grid gap-4">
               <div className="space-y-1">
-                <label className="text-[10px] uppercase font-black text-gray-500 ml-1">Nome da Plataforma</label>
+                <label className="text-[10px] uppercase font-black text-gray-400 ml-1">Nome da Plataforma</label>
                 <input 
-                  className="w-full p-4 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500" 
+                  className="w-full p-4 rounded-2xl text-sm bg-[#111] border border-white/10 outline-none focus:border-yellow-500 text-white placeholder:text-gray-700" 
                   value={editingLink.title || ''} 
                   onChange={e => setEditingLink({...editingLink, title: e.target.value})} 
                   required
@@ -252,21 +257,21 @@ const AdminPanel: React.FC = () => {
               </div>
               
               <div className="space-y-1">
-                <label className="text-[10px] uppercase font-black text-gray-500 ml-1">Link de Afiliado</label>
+                <label className="text-[10px] uppercase font-black text-gray-400 ml-1">Link de Afiliado (URL Completa)</label>
                 <input 
-                  className="w-full p-4 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500" 
+                  className="w-full p-4 rounded-2xl text-sm bg-[#111] border border-white/10 outline-none focus:border-yellow-500 text-white placeholder:text-gray-700" 
                   value={editingLink.url || ''} 
                   onChange={e => setEditingLink({...editingLink, url: e.target.value})} 
                   required
-                  placeholder="https://..."
+                  placeholder="https://plataforma.com/?aff=123"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-black text-gray-500 ml-1">Estilo do Botão</label>
+                  <label className="text-[10px] uppercase font-black text-gray-400 ml-1">Estilo Visual</label>
                   <select 
-                    className="w-full p-4 rounded-2xl text-xs bg-neutral-900 border border-white/10 outline-none focus:border-yellow-500 text-white" 
+                    className="w-full p-4 rounded-2xl text-xs bg-[#111] border border-white/10 outline-none focus:border-yellow-500 text-white appearance-none cursor-pointer" 
                     value={editingLink.type || 'glass'} 
                     onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}
                   >
@@ -277,43 +282,48 @@ const AdminPanel: React.FC = () => {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-black text-gray-500 ml-1">Ícone</label>
+                  <label className="text-[10px] uppercase font-black text-gray-400 ml-1">Tipo de Ícone</label>
                   <select 
-                    className="w-full p-4 rounded-2xl text-xs bg-neutral-900 border border-white/10 outline-none focus:border-yellow-500 text-white" 
-                    value={editingLink.icon || 'chip'} 
-                    onChange={e => setEditingLink({...editingLink, icon: e.target.value as any})}
+                    className="w-full p-4 rounded-2xl text-xs bg-[#111] border border-white/10 outline-none focus:border-yellow-500 text-white appearance-none cursor-pointer" 
+                    value={editingLink.icon || 'auto'} 
+                    onChange={e => setEditingLink({...editingLink, icon: e.target.value})}
                   >
-                    {Object.keys(Icons).map(i => <option key={i} value={i}>{i.toUpperCase()}</option>)}
+                    <option value="auto">🌐 Ícone Automático do Site</option>
+                    {Object.keys(Icons).map(i => (
+                      <option key={i} value={i}>
+                        {i.toUpperCase()} (Manual)
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] uppercase font-black text-gray-500 ml-1">Texto de Destaque (Badge)</label>
+                <label className="text-[10px] uppercase font-black text-gray-400 ml-1">Selo de Destaque (Badge)</label>
                 <input 
                   placeholder="Ex: NOVO ou PAGANDO MUITO"
-                  className="w-full p-4 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500" 
+                  className="w-full p-4 rounded-2xl text-sm bg-[#111] border border-white/10 outline-none focus:border-yellow-500 text-white placeholder:text-gray-700" 
                   value={editingLink.badge || ''} 
                   onChange={e => setEditingLink({...editingLink, badge: e.target.value})} 
                 />
               </div>
               
               <div className="space-y-1">
-                <label className="text-[10px] uppercase font-black text-gray-500 ml-1">Breve Descrição</label>
+                <label className="text-[10px] uppercase font-black text-gray-400 ml-1">Chamada de Bônus (Descrição)</label>
                 <input 
                   placeholder="Ex: Bônus de 100% no 1º depósito"
-                  className="w-full p-4 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500" 
+                  className="w-full p-4 rounded-2xl text-sm bg-[#111] border border-white/10 outline-none focus:border-yellow-500 text-white placeholder:text-gray-700" 
                   value={editingLink.description || ''} 
                   onChange={e => setEditingLink({...editingLink, description: e.target.value})} 
                 />
               </div>
             </div>
 
-            <div className="flex gap-3 pt-6">
-              <button type="submit" disabled={loading} className="flex-1 py-5 gold-gradient text-black font-black rounded-2xl shadow-xl uppercase cursor-pointer hover:brightness-110 active:scale-95 transition-all">
-                {loading ? 'Processando...' : 'Confirmar e Salvar'}
+            <div className="flex gap-3 pt-6 border-t border-white/5">
+              <button type="submit" disabled={loading} className="flex-1 py-5 gold-gradient text-black font-black rounded-2xl shadow-xl uppercase cursor-pointer hover:brightness-110 active:scale-95 transition-all disabled:opacity-50">
+                {loading ? 'Salvando...' : 'Confirmar e Publicar'}
               </button>
-              <button type="button" onClick={() => setEditingLink(null)} className="px-8 py-5 bg-white/5 hover:bg-white/10 rounded-2xl text-xs font-bold uppercase transition-colors cursor-pointer">
+              <button type="button" onClick={() => setEditingLink(null)} className="px-8 py-5 bg-white/5 hover:bg-white/10 rounded-2xl text-xs font-bold uppercase transition-colors cursor-pointer text-gray-400 hover:text-white">
                 Cancelar
               </button>
             </div>

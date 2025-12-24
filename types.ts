@@ -5,7 +5,7 @@ export interface CasinoLink {
   description: string;
   url: string;
   type: 'gold' | 'neon-purple' | 'neon-green' | 'glass';
-  icon: 'slot' | 'chip' | 'card' | 'crown' | 'fire' | 'trophy';
+  icon: string; // Mudado de união de literais para string para suportar URLs ou 'auto'
   badge?: string;
   position: number;
   is_highlighted: boolean;

@@ -22,19 +22,46 @@ const LinkButton: React.FC<Props> = ({ link }) => {
     }
   };
 
+  const renderIcon = () => {
+    // Se for 'auto', tenta pegar o favicon do domínio
+    if (link.icon === 'auto' || (!Icons[link.icon] && link.url.startsWith('http'))) {
+      try {
+        const url = new URL(link.url);
+        const faviconUrl = `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=128`;
+        return (
+          <img 
+            src={faviconUrl} 
+            alt={link.title} 
+            className="w-8 h-8 object-contain rounded-lg shadow-sm"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = 'https://cdn-icons-png.flaticon.com/512/149/149071.png'; // Fallback
+            }}
+          />
+        );
+      } catch (e) {
+        return Icons.chip; // Fallback se a URL for inválida
+      }
+    }
+
+    // Se for um ícone pré-definido
+    return Icons[link.icon] || Icons.chip;
+  };
+
   return (
     <a
       href={link.url}
-      className={`relative w-full p-4 rounded-2xl flex items-center gap-4 group overflow-hidden ${getStyleClasses()}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`relative w-full p-4 rounded-2xl flex items-center gap-4 group overflow-hidden border ${getStyleClasses()}`}
     >
       {/* Visual background effect for hover */}
       <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
       
       {/* Icon Section */}
-      <div className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center ${
+      <div className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden ${
         link.type === 'gold' ? 'bg-black/10' : 'bg-white/5'
       }`}>
-        {Icons[link.icon]}
+        {renderIcon()}
       </div>
 
       {/* Content Section */}
@@ -42,8 +69,8 @@ const LinkButton: React.FC<Props> = ({ link }) => {
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-extrabold uppercase tracking-wider">{link.title}</h3>
           {link.badge && (
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-              link.type === 'gold' ? 'bg-black text-yellow-500' : 'bg-white/10 text-white'
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap ${
+              link.type === 'gold' ? 'bg-black text-yellow-500' : 'bg-yellow-500 text-black shadow-lg'
             }`}>
               {link.badge}
             </span>
