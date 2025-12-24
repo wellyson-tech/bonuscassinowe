@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { CasinoLink } from '../types';
@@ -13,7 +14,6 @@ const AdminPanel: React.FC = () => {
     fetchLinks();
   }, []);
 
-  // ✅ FETCH CORRIGIDO (SEM FALSO POSITIVO)
   const fetchLinks = async () => {
     try {
       const { data, error } = await supabase
@@ -22,18 +22,14 @@ const AdminPanel: React.FC = () => {
         .order('position', { ascending: true });
 
       if (error) {
-        // ❌ Só tabela inexistente gera alerta
         if (error.code === '42P01') {
           setErrorStatus('TABLE_MISSING');
           return;
         }
-
         console.error('Erro Supabase:', error);
-        setErrorStatus(null);
         return;
       }
 
-      // ✅ Tabela existe (mesmo vazia)
       setErrorStatus(null);
       setLinks(data ?? []);
     } catch (err) {
@@ -65,13 +61,11 @@ const AdminPanel: React.FC = () => {
           .from('links')
           .update(payload)
           .eq('id', editingLink.id);
-
         error = result.error;
       } else {
         const result = await supabase
           .from('links')
           .insert([{ ...payload, position: links.length }]);
-
         error = result.error;
       }
 
@@ -81,7 +75,7 @@ const AdminPanel: React.FC = () => {
       await fetchLinks();
       alert('✅ Link salvo com sucesso!');
     } catch (err: any) {
-      alert('❌ Erro ao salvar: ' + (err.message || 'Verifique permissões.'));
+      alert('❌ Erro ao salvar: ' + (err.message || 'Verifique permissões ou se a tabela existe.'));
     } finally {
       setLoading(false);
     }
@@ -103,8 +97,20 @@ const AdminPanel: React.FC = () => {
     fetchLinks();
   };
 
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      window.location.reload();
+    } catch (err) {
+      console.error("Erro ao sair:", err);
+      // Força o reload se o signOut falhar por algum motivo de rede
+      window.location.reload();
+    }
+  };
+
   return (
-    <div className="w-full max-w-4xl mx-auto p-6 bg-[#050505] min-h-screen text-white pb-24">
+    <div className="w-full max-w-4xl mx-auto p-6 bg-[#050505] min-h-screen text-white pb-24 relative z-[50]">
+      {/* HEADER */}
       <div className="flex justify-between items-center mb-10 border-b border-white/10 pb-6">
         <div>
           <h2 className="text-2xl font-bold gold-gradient bg-clip-text text-transparent uppercase tracking-tight">
@@ -115,16 +121,14 @@ const AdminPanel: React.FC = () => {
           </p>
         </div>
         <button
-          onClick={() => {
-            supabase.auth.signOut();
-            window.location.reload();
-          }}
+          onClick={handleLogout}
           className="px-5 py-2.5 bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white border border-red-600/30 rounded-xl text-[10px] font-black transition-all uppercase"
         >
           Finalizar Sessão
         </button>
       </div>
 
+      {/* ERRO DE TABELA */}
       {errorStatus === 'TABLE_MISSING' && (
         <div className="mb-10 p-8 bg-red-950/20 border-2 border-red-500/40 rounded-3xl shadow-2xl">
           <div className="flex items-center gap-4 mb-4">
@@ -134,16 +138,23 @@ const AdminPanel: React.FC = () => {
             </h3>
           </div>
           <p className="text-sm text-gray-300 mb-6 leading-relaxed">
-            A tabela <b>links</b> não existe neste projeto Supabase.
-            Crie a tabela e recarregue esta página.
+            A tabela <b>links</b> não existe neste projeto Supabase. 
+            Clique no botão abaixo para abrir o SQL Editor e criar a tabela.
           </p>
+          <button 
+            onClick={() => window.open('https://supabase.com/dashboard/project/ufqhxtfsoxzrofjpvhpk/sql/new', '_blank')}
+            className="w-full py-4 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-red-500 transition-colors shadow-lg"
+          >
+            Abrir Editor SQL
+          </button>
         </div>
       )}
 
+      {/* LISTAGEM E BOTÃO ADICIONAR */}
       {!errorStatus && (
         <>
           <button
-            onClick={() =>
+            onClick={() => {
               setEditingLink({
                 title: '',
                 url: '',
@@ -152,9 +163,9 @@ const AdminPanel: React.FC = () => {
                 icon: 'chip',
                 is_highlighted: false,
                 badge: '',
-              })
-            }
-            className="mb-10 w-full py-6 gold-gradient text-black font-black rounded-2xl shadow-2xl uppercase tracking-tighter text-lg"
+              });
+            }}
+            className="mb-10 w-full py-6 gold-gradient text-black font-black rounded-2xl shadow-2xl uppercase tracking-tighter text-lg active:scale-95 transition-transform cursor-pointer"
           >
             + Adicionar Nova Oferta VIP
           </button>
@@ -170,16 +181,23 @@ const AdminPanel: React.FC = () => {
               links.map(link => (
                 <div
                   key={link.id}
-                  className="glass-card p-5 rounded-2xl flex items-center justify-between border border-white/5 shadow-xl"
+                  className="glass-card p-5 rounded-2xl flex items-center justify-between border border-white/5 shadow-xl hover:border-yellow-500/30 transition-all"
                 >
                   <div className="flex items-center gap-5">
                     <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-yellow-500">
                       {Icons[link.icon as keyof typeof Icons] || Icons.chip}
                     </div>
                     <div>
-                      <h4 className="font-black text-sm uppercase">
-                        {link.title}
-                      </h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-black text-sm uppercase">
+                          {link.title}
+                        </h4>
+                        {link.badge && (
+                          <span className="text-[8px] bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded font-black uppercase">
+                            {link.badge}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[10px] text-gray-500 truncate max-w-[200px]">
                         {link.url}
                       </p>
@@ -188,13 +206,13 @@ const AdminPanel: React.FC = () => {
                   <div className="flex gap-2">
                     <button
                       onClick={() => setEditingLink(link)}
-                      className="p-3 bg-white/5 rounded-xl"
+                      className="p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
                     >
                       ✏️
                     </button>
                     <button
                       onClick={() => handleDelete(link.id!)}
-                      className="p-3 bg-red-500/10 text-red-500 rounded-xl"
+                      className="p-3 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-xl transition-colors cursor-pointer"
                     >
                       🗑️
                     </button>
@@ -204,6 +222,103 @@ const AdminPanel: React.FC = () => {
             )}
           </div>
         </>
+      )}
+
+      {/* FORMULÁRIO MODAL */}
+      {editingLink && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 z-[9999]">
+          <form onSubmit={handleSave} className="bg-[#0c0c0c] border border-white/10 p-8 rounded-3xl w-full max-w-lg space-y-5 shadow-[0_0_100px_rgba(0,0,0,1)]">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-xl font-black gold-gradient bg-clip-text text-transparent uppercase tracking-tight">Configurar Oferta</h3>
+              <button 
+                type="button" 
+                onClick={() => setEditingLink(null)}
+                className="text-gray-500 hover:text-white transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="grid gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-black text-gray-500 ml-1">Nome da Plataforma</label>
+                <input 
+                  className="w-full p-4 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500" 
+                  value={editingLink.title || ''} 
+                  onChange={e => setEditingLink({...editingLink, title: e.target.value})} 
+                  required
+                  placeholder="Ex: Royal Casino"
+                />
+              </div>
+              
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-black text-gray-500 ml-1">Link de Afiliado</label>
+                <input 
+                  className="w-full p-4 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500" 
+                  value={editingLink.url || ''} 
+                  onChange={e => setEditingLink({...editingLink, url: e.target.value})} 
+                  required
+                  placeholder="https://..."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-black text-gray-500 ml-1">Estilo do Botão</label>
+                  <select 
+                    className="w-full p-4 rounded-2xl text-xs bg-neutral-900 border border-white/10 outline-none focus:border-yellow-500 text-white" 
+                    value={editingLink.type || 'glass'} 
+                    onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}
+                  >
+                    <option value="gold">💎 Dourado Premium</option>
+                    <option value="neon-purple">💜 Roxo Neon</option>
+                    <option value="neon-green">💚 Verde Neon</option>
+                    <option value="glass">⚪ Vidro Simples</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-black text-gray-500 ml-1">Ícone</label>
+                  <select 
+                    className="w-full p-4 rounded-2xl text-xs bg-neutral-900 border border-white/10 outline-none focus:border-yellow-500 text-white" 
+                    value={editingLink.icon || 'chip'} 
+                    onChange={e => setEditingLink({...editingLink, icon: e.target.value as any})}
+                  >
+                    {Object.keys(Icons).map(i => <option key={i} value={i}>{i.toUpperCase()}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-black text-gray-500 ml-1">Texto de Destaque (Badge)</label>
+                <input 
+                  placeholder="Ex: NOVO ou PAGANDO MUITO"
+                  className="w-full p-4 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500" 
+                  value={editingLink.badge || ''} 
+                  onChange={e => setEditingLink({...editingLink, badge: e.target.value})} 
+                />
+              </div>
+              
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-black text-gray-500 ml-1">Breve Descrição</label>
+                <input 
+                  placeholder="Ex: Bônus de 100% no 1º depósito"
+                  className="w-full p-4 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500" 
+                  value={editingLink.description || ''} 
+                  onChange={e => setEditingLink({...editingLink, description: e.target.value})} 
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-6">
+              <button type="submit" disabled={loading} className="flex-1 py-5 gold-gradient text-black font-black rounded-2xl shadow-xl uppercase cursor-pointer hover:brightness-110 active:scale-95 transition-all">
+                {loading ? 'Processando...' : 'Confirmar e Salvar'}
+              </button>
+              <button type="button" onClick={() => setEditingLink(null)} className="px-8 py-5 bg-white/5 hover:bg-white/10 rounded-2xl text-xs font-bold uppercase transition-colors cursor-pointer">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </div>
       )}
     </div>
   );

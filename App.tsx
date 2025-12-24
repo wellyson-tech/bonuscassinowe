@@ -18,9 +18,14 @@ const App: React.FC = () => {
   useEffect(() => {
     const initApp = async () => {
       try {
-        await fetchLinks();
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         setSession(currentSession);
+        // Se já tiver sessão, pula para o admin se solicitado ou mantém public
+        if (currentSession) {
+          await fetchLinks();
+        } else {
+          await fetchLinks();
+        }
       } catch (e) {
         console.error("Erro na inicialização:", e);
       } finally {
@@ -32,32 +37,40 @@ const App: React.FC = () => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (!session) setView('public');
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const fetchLinks = async () => {
-    const { data, error } = await supabase
-      .from('links')
-      .select('*')
-      .order('position', { ascending: true });
-    
-    if (!error && data) {
-      setLinks(data);
+    try {
+      const { data, error } = await supabase
+        .from('links')
+        .select('*')
+        .order('position', { ascending: true });
+      
+      if (!error && data) {
+        setLinks(data);
+      }
+    } catch (e) {
+      console.warn("Tabela links pode não existir ainda.");
     }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      alert('Erro: ' + error.message);
-    } else {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      setSession(data.session);
       setView('admin');
+    } catch (error: any) {
+      alert('Erro ao entrar: ' + error.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   if (initializing) {
@@ -68,19 +81,24 @@ const App: React.FC = () => {
     );
   }
 
+  // Se houver sessão, sempre prioriza mostrar o Admin se o usuário não quiser ver o site público
+  if (session && (view === 'admin' || view === 'login')) {
+    return <AdminPanel />;
+  }
+
   if (view === 'login' && !session) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-[#050505]">
         <form onSubmit={handleLogin} className="w-full max-w-sm glass-card p-8 rounded-2xl space-y-6 border border-white/5 shadow-2xl">
           <div className="text-center">
-            <h2 className="font-display text-2xl font-bold gold-gradient bg-clip-text text-transparent uppercase">Acesso Restrito</h2>
+            <h2 className="font-display text-2xl font-bold gold-gradient bg-clip-text text-transparent uppercase tracking-tighter">Acesso Restrito</h2>
             <p className="text-gray-500 text-[10px] uppercase tracking-widest mt-1">Portal do Administrador</p>
           </div>
           <div className="space-y-4">
             <input 
               type="email" 
               placeholder="Seu E-mail" 
-              className="w-full p-4 rounded-xl text-sm"
+              className="w-full p-4 rounded-xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 transition-colors"
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
@@ -88,7 +106,7 @@ const App: React.FC = () => {
             <input 
               type="password" 
               placeholder="Sua Senha" 
-              className="w-full p-4 rounded-xl text-sm"
+              className="w-full p-4 rounded-xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 transition-colors"
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
@@ -101,10 +119,6 @@ const App: React.FC = () => {
         </form>
       </div>
     );
-  }
-
-  if ((view === 'admin' || session) && session) {
-    return <AdminPanel />;
   }
 
   return (
@@ -156,7 +170,7 @@ const App: React.FC = () => {
           <span>&copy; {new Date().getFullYear()} {BRAND.name}</span>
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
-            <span>Servidor Criptografado</span>
+            <span>Servidor Seguro</span>
           </div>
         </div>
       </footer>

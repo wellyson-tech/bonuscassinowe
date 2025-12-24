@@ -3,8 +3,8 @@ import React from 'react';
 import { CasinoBrand } from './types';
 
 export const BRAND: CasinoBrand = {
-  name: "ROYAL STAKES",
-  tagline: "O Destino Premium para Apostas Globais",
+  name: "Bônus CassinoWE",
+  tagline: "As Melhores Plataformas com bônus estão aqui",
   logoUrl: "https://picsum.photos/seed/casino-logo/200/200",
   verified: true
 };
