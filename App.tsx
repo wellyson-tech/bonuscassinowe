@@ -13,7 +13,6 @@ const App: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isConfigured, setIsConfigured] = useState(true);
 
   useEffect(() => {
     fetchLinks();
@@ -33,7 +32,6 @@ const App: React.FC = () => {
 
   const fetchLinks = async () => {
     try {
-      // FETCH LINKS
       const { data, error } = await supabase
         .from('links')
         .select('*')
@@ -41,10 +39,8 @@ const App: React.FC = () => {
       
       if (error) throw error;
       if (data) setLinks(data);
-      setIsConfigured(true);
     } catch (err) {
-      console.warn('Supabase não configurado ou erro na busca:', err);
-      setIsConfigured(false);
+      console.warn('Erro ao buscar links:', err);
     }
   };
 
@@ -52,7 +48,9 @@ const App: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) alert(error.message);
+    if (error) {
+      alert('Erro de login: ' + error.message);
+    }
     setLoading(false);
   };
 
@@ -123,12 +121,6 @@ const App: React.FC = () => {
           <h1 className="font-display text-4xl font-bold gold-gradient bg-clip-text text-transparent mb-2 tracking-tight">{BRAND.name}</h1>
           <p className="text-gray-400 text-sm uppercase tracking-[0.2em] font-medium opacity-80">{BRAND.tagline}</p>
         </section>
-
-        {!isConfigured && (
-          <div className="w-full p-4 mb-6 border border-yellow-500/30 bg-yellow-500/5 rounded-xl text-yellow-200/80 text-xs text-center leading-relaxed">
-            ⚠️ <strong>Configuração Necessária:</strong> Insira seu URL e Anon Key no arquivo <code className="text-white">lib/supabase.ts</code> para carregar os links dinâmicos do banco de dados.
-          </div>
-        )}
 
         <section className="w-full flex flex-col gap-4 mb-16">
           {links.length > 0 ? (
