@@ -116,9 +116,9 @@ const AdminPanel: React.FC = () => {
         </button>
       </div>
 
-      {/* Seletor de Abas no Admin (Para não fazer bagunça) */}
+      {/* Seletor de Abas no Admin */}
       <div className="mb-10">
-        <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-4 block ml-2">Filtrar por Página:</label>
+        <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-4 block ml-2">Páginas Disponíveis:</label>
         <div className="flex flex-wrap gap-2 p-2 bg-white/[0.02] border border-white/5 rounded-[2rem]">
           {categories.map((cat) => (
             <button
@@ -133,15 +133,14 @@ const AdminPanel: React.FC = () => {
               {cat}
             </button>
           ))}
-          {/* Botão para simular criação de nova página rápida */}
           <button 
             onClick={() => {
-              const newCat = prompt("Digite o nome da nova página (ex: Página 3):");
+              const newCat = prompt("Nome da nova página:");
               if(newCat) setActiveAdminTab(newCat);
             }}
             className="px-4 py-3 rounded-full text-[10px] font-black uppercase tracking-widest bg-white/5 text-yellow-500/50 hover:text-yellow-500"
           >
-            + Nova Aba
+            + Criar Aba
           </button>
         </div>
       </div>
@@ -154,19 +153,19 @@ const AdminPanel: React.FC = () => {
         }}
         className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-sm mb-12 shadow-2xl hover:scale-[1.01] transition-all active:scale-95"
       >
-        + Adicionar na {activeAdminTab}
+        + Novo Link em "{activeAdminTab}"
       </button>
 
-      {/* Lista Filtrada */}
+      {/* Lista Filtrada com Contador de Cliques */}
       <div className="space-y-4">
         <div className="flex justify-between items-center mb-6 px-2">
-          <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em]">Links da {activeAdminTab}</h3>
+          <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em]">Plataformas na {activeAdminTab}</h3>
           <span className="text-[9px] bg-white/10 px-3 py-1 rounded-full text-gray-400 font-bold">{filteredLinks.length} Links</span>
         </div>
         
         {filteredLinks.length === 0 ? (
           <div className="text-center py-20 border border-dashed border-white/5 rounded-[3rem] bg-white/[0.01]">
-            <p className="text-gray-600 uppercase text-[9px] font-black tracking-[0.5em]">Esta página está vazia</p>
+            <p className="text-gray-600 uppercase text-[9px] font-black tracking-[0.5em]">Sem links cadastrados</p>
           </div>
         ) : (
           filteredLinks.map((link) => (
@@ -177,7 +176,11 @@ const AdminPanel: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="font-black text-sm uppercase text-white tracking-tight">{link.title}</h4>
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    {/* RESTAURADO: Contador de Cliques */}
+                    <span className="text-[8px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/10 uppercase font-black">
+                      🖱️ {link.click_count || 0} Cliques
+                    </span>
                     <span className="text-[8px] bg-white/5 text-gray-500 px-2 py-0.5 rounded uppercase font-black">
                       Estilo: {link.type}
                     </span>
