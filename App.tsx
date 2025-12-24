@@ -16,7 +16,6 @@ const App: React.FC = () => {
   const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
-    // Lógica de Roteamento Simples via URL
     const checkPath = () => {
       const path = window.location.pathname;
       const hash = window.location.hash;
@@ -35,7 +34,6 @@ const App: React.FC = () => {
             setSession(currentSession);
             setView('admin');
           } else {
-            // Se o usuário logado não for o ADMIN_UID, desloga
             await supabase.auth.signOut();
             setSession(null);
           }
@@ -55,7 +53,6 @@ const App: React.FC = () => {
         setSession(session);
         setView('admin');
       } else if (session) {
-        // Bloqueio de outros usuários
         supabase.auth.signOut();
         alert("Acesso negado. Apenas o administrador mestre pode entrar.");
       } else {
@@ -80,7 +77,7 @@ const App: React.FC = () => {
         setLinks(data);
       }
     } catch (e) {
-      console.warn("Tabela links não encontrada ou sem acesso.");
+      console.warn("Tabela links não encontrada.");
     }
   };
 
@@ -92,13 +89,13 @@ const App: React.FC = () => {
       if (error) throw error;
       
       if (data.user?.id !== ADMIN_UID) {
-        throw new Error("Este UID não possui permissões administrativas.");
+        throw new Error("UID sem permissões.");
       }
 
       setSession(data.session);
       setView('admin');
     } catch (error: any) {
-      alert('Falha na Autenticação: ' + error.message);
+      alert('Falha: ' + error.message);
       await supabase.auth.signOut();
     } finally {
       setLoading(false);
@@ -127,27 +124,12 @@ const App: React.FC = () => {
             <p className="text-gray-500 text-[10px] uppercase tracking-[0.4em] mt-2 font-black opacity-50">Identificação Necessária</p>
           </div>
           <div className="space-y-4">
-            <input 
-              type="email" 
-              placeholder="E-mail Administrativo" 
-              className="w-full p-4 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 transition-all placeholder:text-gray-600"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-            />
-            <input 
-              type="password" 
-              placeholder="Chave de Acesso" 
-              className="w-full p-4 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 transition-all placeholder:text-gray-600"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-            />
+            <input type="email" placeholder="E-mail Administrativo" className="w-full p-4 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white" value={email} onChange={e => setEmail(e.target.value)} required />
+            <input type="password" placeholder="Chave de Acesso" className="w-full p-4 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white" value={password} onChange={e => setPassword(e.target.value)} required />
           </div>
-          <button type="submit" disabled={loading} className="w-full py-5 gold-gradient text-black font-black rounded-2xl hover:brightness-110 active:scale-95 transition-all shadow-lg uppercase tracking-widest text-xs">
+          <button type="submit" disabled={loading} className="w-full py-5 gold-gradient text-black font-black rounded-2xl hover:brightness-110 uppercase tracking-widest text-xs">
             {loading ? 'Validando...' : 'Desbloquear Sistema'}
           </button>
-          <button type="button" onClick={() => { window.location.href = "/"; setView('public'); }} className="w-full text-[10px] text-gray-600 hover:text-white uppercase font-bold tracking-widest transition-colors">Abortar e Voltar</button>
         </form>
       </div>
     );
@@ -155,16 +137,13 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen relative overflow-hidden flex flex-col items-center bg-[#050505]">
-      {/* Background Decor */}
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-0">
         <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-yellow-500/5 blur-[120px] rounded-full" />
-        <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-purple-900/10 blur-[120px] rounded-full" />
       </div>
 
       <main className="relative z-10 w-full max-w-md px-6 py-12 flex flex-col items-center">
         <header className="text-center mb-12 w-full">
           <div className="relative inline-block mb-6 group">
-            <div className="absolute inset-0 bg-yellow-500/10 blur-3xl rounded-full group-hover:bg-yellow-500/20 transition-colors" />
             <div className="relative p-1 rounded-full gold-gradient animate-float">
               <img src={BRAND.logoUrl} alt={BRAND.name} className="w-28 h-28 rounded-full border-4 border-[#050505] object-cover shadow-2xl" />
             </div>
@@ -175,9 +154,9 @@ const App: React.FC = () => {
 
         <section className="w-full flex flex-col gap-4 mb-20">
           {links.length > 0 ? (
-            links.map((link) => <LinkButton key={link.id} link={link} />)
+            links.map((link) => <LinkButton key={link.id} link={link} isAdminView={false} />)
           ) : (
-            <div className="text-center py-24 glass-card rounded-3xl border-dashed border-white/10">
+            <div className="text-center py-24 glass-card rounded-3xl">
               <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold">Buscando as melhores ofertas...</p>
             </div>
           )}
@@ -190,15 +169,10 @@ const App: React.FC = () => {
             </a>
           ))}
         </div>
-
-        <div className="flex items-center gap-4 mb-12 opacity-30 grayscale group hover:opacity-100 transition-opacity">
-          <div className="text-[10px] font-black border border-white/40 px-2 py-1 rounded">18+</div>
-          <div className="text-[10px] font-black uppercase tracking-widest">Jogue com Responsabilidade</div>
-        </div>
       </main>
 
       <footer className="w-full glass-card py-6 px-6 border-t border-white/5 mt-auto">
-        <div className="max-w-md mx-auto flex justify-between items-center text-[9px] font-black text-gray-600 tracking-[0.2em] uppercase">
+        <div className="max-w-md mx-auto flex justify-between items-center text-[9px] font-black text-gray-600 uppercase">
           <span>&copy; {new Date().getFullYear()} {BRAND.name}</span>
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />

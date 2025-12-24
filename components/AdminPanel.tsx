@@ -9,6 +9,7 @@ const AdminPanel: React.FC = () => {
   const [editingLink, setEditingLink] = useState<Partial<CasinoLink> | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorStatus, setErrorStatus] = useState<string | null>(null);
+  const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
 
   useEffect(() => {
     fetchLinks();
@@ -34,6 +35,52 @@ const AdminPanel: React.FC = () => {
       setLinks(data ?? []);
     } catch (err) {
       console.error('Erro inesperado:', err);
+    }
+  };
+
+  // Funções de Drag & Drop
+  const onDragStart = (index: number) => {
+    setDraggedItemIndex(index);
+  };
+
+  const onDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedItemIndex === null || draggedItemIndex === index) return;
+
+    const newLinks = [...links];
+    const itemToMove = newLinks[draggedItemIndex];
+    newLinks.splice(draggedItemIndex, 1);
+    newLinks.splice(index, 0, itemToMove);
+    
+    setDraggedItemIndex(index);
+    setLinks(newLinks);
+  };
+
+  const onDragEnd = async () => {
+    setDraggedItemIndex(null);
+    setLoading(true);
+    
+    // Atualizar posições no banco de dados
+    try {
+      const updates = links.map((link, idx) => ({
+        id: link.id,
+        position: idx,
+        title: link.title,
+        url: link.url,
+        type: link.type,
+        icon: link.icon,
+        description: link.description,
+        badge: link.badge,
+        is_highlighted: link.is_highlighted
+      }));
+
+      const { error } = await supabase.from('links').upsert(updates);
+      if (error) throw error;
+      console.log("Ordem sincronizada!");
+    } catch (err) {
+      alert("Erro ao salvar nova ordem!");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -65,7 +112,7 @@ const AdminPanel: React.FC = () => {
       } else {
         const result = await supabase
           .from('links')
-          .insert([{ ...payload, position: links.length }]);
+          .insert([{ ...payload, position: links.length, click_count: 0 }]);
         error = result.error;
       }
 
@@ -102,32 +149,28 @@ const AdminPanel: React.FC = () => {
     window.location.href = "/";
   };
 
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return 'Recém criado';
-    return new Date(dateStr).toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    });
-  };
-
   const renderPreviewIcon = (link: Partial<CasinoLink>) => {
-    if (link.icon === 'auto' || (!Icons[link.icon as string] && link.url?.startsWith('http'))) {
+    const isAuto = !link.icon || link.icon === 'auto';
+    
+    if (isAuto && link.url && link.url.length > 5) {
       try {
-        const url = new URL(link.url || 'http://localhost');
+        const urlWithProtocol = link.url.startsWith('http') ? link.url : `https://${link.url}`;
+        const domain = new URL(urlWithProtocol).hostname;
         return (
           <img 
-            src={`https://www.google.com/s2/favicons?domain=${url.hostname}&sz=64`}
-            className="w-10 h-10 object-contain"
+            src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
+            className="w-10 h-10 object-contain rounded-lg bg-white/5 p-1.5 shadow-lg"
             alt="Favicon"
             onError={(e) => { (e.target as HTMLImageElement).src = 'https://cdn-icons-png.flaticon.com/512/149/149071.png'; }}
           />
         );
       } catch (e) {
-        return Icons.chip;
+        return <div className="w-8 h-8 text-white/10">{Icons.chip}</div>;
       }
     }
-    return Icons[link.icon as string] || Icons.chip;
+    
+    const iconName = link.icon as string;
+    return <div className="w-10 h-10 text-yellow-500 p-1">{Icons[iconName] || Icons.chip}</div>;
   };
 
   return (
@@ -159,6 +202,13 @@ const AdminPanel: React.FC = () => {
 
       {!errorStatus && (
         <div className="space-y-10">
+          <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-2xl mb-8">
+            <p className="text-[10px] text-yellow-500 font-black uppercase tracking-widest flex items-center gap-2">
+              <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+              Dica: Clique e arraste os cards para mudar a ordem de exibição.
+            </p>
+          </div>
+
           <button
             onClick={() => setEditingLink({ title: '', url: '', description: '', type: 'glass', icon: 'auto', is_highlighted: false, badge: '' })}
             className="w-full py-8 gold-gradient text-black font-black rounded-3xl shadow-2xl uppercase tracking-tighter text-xl active:scale-[0.98] transition-all cursor-pointer hover:brightness-110"
@@ -172,37 +222,38 @@ const AdminPanel: React.FC = () => {
                 <p className="text-gray-600 font-black uppercase tracking-widest text-xs">O ecossistema está vazio. Inicie sua primeira oferta acima.</p>
               </div>
             ) : (
-              links.map(link => (
+              links.map((link, index) => (
                 <div
                   key={link.id}
-                  className="glass-card p-6 rounded-3xl flex flex-col md:flex-row items-center justify-between border border-white/5 shadow-2xl hover:border-yellow-500/20 transition-all group"
+                  draggable
+                  onDragStart={() => onDragStart(index)}
+                  onDragOver={(e) => onDragOver(e, index)}
+                  onDragEnd={onDragEnd}
+                  className={`glass-card p-6 rounded-3xl flex flex-col md:flex-row items-center justify-between border border-white/5 shadow-2xl hover:border-yellow-500/20 transition-all group cursor-move ${draggedItemIndex === index ? 'opacity-30 scale-95' : 'opacity-100'}`}
                 >
-                  <div className="flex items-center gap-6 w-full md:w-auto mb-6 md:mb-0">
-                    <div className="w-20 h-20 bg-white/5 rounded-2xl flex items-center justify-center text-yellow-500 overflow-hidden relative">
+                  <div className="flex items-center gap-6 w-full md:w-auto mb-6 md:mb-0 pointer-events-none">
+                    <div className="w-20 h-20 bg-white/5 rounded-2xl flex items-center justify-center overflow-hidden relative border border-white/10">
                       {renderPreviewIcon(link)}
                     </div>
                     <div>
                       <div className="flex items-center gap-3 mb-1">
                         <h4 className="font-black text-base uppercase tracking-tight">{link.title}</h4>
-                        <span className="text-[8px] bg-white/5 text-gray-500 px-2 py-0.5 rounded font-bold uppercase">{formatDate(link.created_at)}</span>
+                        <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-black uppercase tracking-widest border border-emerald-500/30">
+                          {link.click_count || 0} Acessos
+                        </span>
                       </div>
                       <p className="text-[10px] text-gray-500 truncate max-w-[280px] font-mono opacity-60">{link.url}</p>
-                      {link.badge && (
-                        <span className="inline-block mt-2 text-[8px] bg-yellow-500 text-black px-2 py-0.5 rounded font-black uppercase tracking-widest">
-                          {link.badge}
-                        </span>
-                      )}
                     </div>
                   </div>
                   <div className="flex gap-3 w-full md:w-auto">
                     <button
-                      onClick={() => setEditingLink(link)}
+                      onClick={(e) => { e.stopPropagation(); setEditingLink(link); }}
                       className="flex-1 md:flex-none px-6 py-4 bg-white/5 hover:bg-white/10 rounded-2xl transition-all cursor-pointer text-[10px] font-black uppercase tracking-widest border border-white/5"
                     >
                       Editar
                     </button>
                     <button
-                      onClick={() => handleDelete(link.id!)}
+                      onClick={(e) => { e.stopPropagation(); handleDelete(link.id!); }}
                       className="flex-1 md:flex-none px-6 py-4 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-2xl transition-all cursor-pointer text-[10px] font-black uppercase tracking-widest border border-red-500/20"
                     >
                       Excluir
@@ -234,7 +285,7 @@ const AdminPanel: React.FC = () => {
               
               <div className="space-y-2">
                 <label className="text-[9px] uppercase font-black text-gray-500 ml-1 tracking-widest">URL de Redirecionamento</label>
-                <input className="w-full p-5 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white font-mono" value={editingLink.url || ''} onChange={e => setEditingLink({...editingLink, url: e.target.value})} required />
+                <input className="w-full p-5 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white font-mono" value={editingLink.url || ''} onChange={e => setEditingLink({...editingLink, url: e.target.value})} placeholder="https://exemplo.com/bonus" required />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -251,14 +302,14 @@ const AdminPanel: React.FC = () => {
                   <label className="text-[9px] uppercase font-black text-gray-500 ml-1 tracking-widest">Ativo Gráfico (Ícone)</label>
                   <select className="w-full p-5 rounded-2xl text-[10px] font-black bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white uppercase" value={editingLink.icon || 'auto'} onChange={e => setEditingLink({...editingLink, icon: e.target.value})}>
                     <option value="auto">🌐 Automático (Favicon do Site)</option>
-                    {Object.keys(Icons).map(i => <option key={i} value={i}>{i} (Manual)</option>)}
+                    {Object.keys(Icons).map(i => <option key={i} value={i}>{i.toUpperCase()} (Manual)</option>)}
                   </select>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <label className="text-[9px] uppercase font-black text-gray-500 ml-1 tracking-widest">Etiqueta Flash (Badge)</label>
-                <input className="w-full p-5 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white" value={editingLink.badge || ''} onChange={e => setEditingLink({...editingLink, badge: e.target.value})} />
+                <input className="w-full p-5 rounded-2xl text-sm bg-white/5 border border-white/10 outline-none focus:border-yellow-500 text-white" value={editingLink.badge || ''} onChange={e => setEditingLink({...editingLink, badge: e.target.value})} placeholder="Ex: NOVO, 200%, VIP" />
               </div>
               
               <div className="space-y-2">

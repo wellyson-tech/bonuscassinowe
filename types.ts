@@ -5,9 +5,10 @@ export interface CasinoLink {
   description: string;
   url: string;
   type: 'gold' | 'neon-purple' | 'neon-green' | 'glass';
-  icon: string; // Mudado de união de literais para string para suportar URLs ou 'auto'
+  icon: string;
   badge?: string;
   position: number;
+  click_count?: number; // Contador de acessos
   is_highlighted: boolean;
   created_at?: string;
 }
