@@ -8,6 +8,7 @@ const AdminPanel: React.FC = () => {
   const [links, setLinks] = useState<CasinoLink[]>([]);
   const [editingLink, setEditingLink] = useState<Partial<CasinoLink> | null>(null);
   const [loading, setLoading] = useState(false);
+  const [errorStatus, setErrorStatus] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLinks();
@@ -21,8 +22,13 @@ const AdminPanel: React.FC = () => {
     
     if (error) {
       console.error('Erro ao buscar links:', error.message);
+      if (error.message.includes('links')) {
+        setErrorStatus('TABLE_MISSING');
+      }
+    } else {
+      setErrorStatus(null);
+      if (data) setLinks(data);
     }
-    if (data) setLinks(data);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -32,9 +38,9 @@ const AdminPanel: React.FC = () => {
     setLoading(true);
     
     try {
+      let error;
       if (editingLink.id) {
-        // Atualizar link existente
-        const { error } = await supabase
+        const result = await supabase
           .from('links')
           .update({
             title: editingLink.title,
@@ -46,11 +52,9 @@ const AdminPanel: React.FC = () => {
             is_highlighted: editingLink.is_highlighted
           })
           .eq('id', editingLink.id);
-
-        if (error) throw error;
+        error = result.error;
       } else {
-        // Criar novo link
-        const { error } = await supabase
+        const result = await supabase
           .from('links')
           .insert([{ 
             title: editingLink.title,
@@ -62,16 +66,22 @@ const AdminPanel: React.FC = () => {
             is_highlighted: editingLink.is_highlighted || false,
             position: links.length 
           }]);
-
-        if (error) throw error;
+        error = result.error;
       }
+
+      if (error) throw error;
 
       setEditingLink(null);
       await fetchLinks();
       alert('✅ Link salvo com sucesso!');
     } catch (err: any) {
       console.error('Erro detalhado:', err);
-      alert('❌ Erro ao salvar: ' + (err.message || 'Verifique se a tabela "links" existe no Supabase.'));
+      if (err.message?.includes('public.links')) {
+        alert('❌ ERRO CRÍTICO: A tabela "links" não existe no seu Supabase. Siga as instruções na tela principal.');
+        setErrorStatus('TABLE_MISSING');
+      } else {
+        alert('❌ Erro ao salvar: ' + (err.message || 'Erro desconhecido.'));
+      }
     } finally {
       setLoading(false);
     }
@@ -101,6 +111,29 @@ const AdminPanel: React.FC = () => {
           SAIR DO PAINEL
         </button>
       </div>
+
+      {errorStatus === 'TABLE_MISSING' && (
+        <div className="mb-8 p-6 bg-red-900/20 border-2 border-red-500/50 rounded-2xl animate-pulse">
+          <h3 className="text-red-500 font-bold mb-2 flex items-center gap-2">
+            ⚠️ TABELA NÃO ENCONTRADA
+          </h3>
+          <p className="text-sm text-gray-300 mb-4">
+            A tabela <strong>links</strong> ainda não foi criada no seu banco de dados. 
+            Você precisa rodar o script SQL no painel do Supabase.
+          </p>
+          <div className="bg-black/40 p-3 rounded-lg border border-white/10 mb-4">
+            <code className="text-[10px] text-gray-400 block break-all">
+              Vá em SQL Editor > New Query > Cole o código do SQL e aperte RUN.
+            </code>
+          </div>
+          <button 
+            onClick={() => window.open('https://supabase.com/dashboard/project/ufqhxtfsoxzrofjpvhpk/sql/new', '_blank')}
+            className="text-xs bg-red-500 text-white px-4 py-2 rounded-lg font-bold hover:bg-red-600 transition-colors"
+          >
+            ABRIR SQL EDITOR DO SUPABASE
+          </button>
+        </div>
+      )}
 
       <button 
         onClick={() => setEditingLink({ title: '', url: '', description: '', type: 'glass', icon: 'chip', is_highlighted: false, badge: '' })}
@@ -143,83 +176,65 @@ const AdminPanel: React.FC = () => {
           <form onSubmit={handleSave} className="bg-neutral-900 border border-white/10 p-8 rounded-2xl w-full max-w-lg space-y-4 shadow-2xl">
             <div className="mb-4">
               <h3 className="text-xl font-bold gold-gradient bg-clip-text text-transparent uppercase tracking-tight">
-                {editingLink.id ? 'Editar Link' : 'Novo Link de Oferta'}
+                {editingLink.id ? 'Editar Link' : 'Novo Link'}
               </h3>
-              <p className="text-xs text-gray-500">Preencha os dados da plataforma ou bônus</p>
             </div>
             
             <div className="space-y-3">
               <input 
-                placeholder="Título (Ex: Cadastro com Bônus)" 
+                placeholder="Título da Oferta" 
                 className="w-full p-4 rounded-xl text-sm" 
                 value={editingLink.title} 
                 onChange={e => setEditingLink({...editingLink, title: e.target.value})} 
                 required
               />
               <input 
-                placeholder="URL (Link de Afiliado)" 
+                placeholder="Link (https://...)" 
                 className="w-full p-4 rounded-xl text-sm" 
                 value={editingLink.url} 
                 onChange={e => setEditingLink({...editingLink, url: e.target.value})} 
                 required
               />
               <input 
-                placeholder="Descrição Curta" 
+                placeholder="Descrição" 
                 className="w-full p-4 rounded-xl text-sm" 
                 value={editingLink.description} 
                 onChange={e => setEditingLink({...editingLink, description: e.target.value})} 
               />
               <input 
-                placeholder="Texto do Badge (Ex: POPULAR, 200%)" 
+                placeholder="Badge (Ex: BÔNUS 200%)" 
                 className="w-full p-4 rounded-xl text-sm" 
                 value={editingLink.badge} 
                 onChange={e => setEditingLink({...editingLink, badge: e.target.value})} 
               />
               
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] text-gray-500 uppercase ml-1">Estilo</label>
-                  <select 
-                    className="w-full p-4 rounded-xl text-sm appearance-none" 
-                    value={editingLink.type} 
-                    onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}
-                  >
-                    <option value="gold">Dourado Premium</option>
-                    <option value="neon-purple">Roxo Neon</option>
-                    <option value="neon-green">Verde Neon</option>
-                    <option value="glass">Transparente</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] text-gray-500 uppercase ml-1">Ícone</label>
-                  <select 
-                    className="w-full p-4 rounded-xl text-sm appearance-none" 
-                    value={editingLink.icon} 
-                    onChange={e => setEditingLink({...editingLink, icon: e.target.value as any})}
-                  >
-                    {Object.keys(Icons).map(i => <option key={i} value={i}>{i.toUpperCase()}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 p-2">
-                <input 
-                  type="checkbox" 
-                  id="highlight"
-                  checked={editingLink.is_highlighted} 
-                  onChange={e => setEditingLink({...editingLink, is_highlighted: e.target.checked})}
-                  className="w-4 h-4 rounded border-white/10"
-                />
-                <label htmlFor="highlight" className="text-xs text-gray-400">Destacar este link (Animação extra)</label>
+                <select 
+                  className="w-full p-4 rounded-xl text-sm" 
+                  value={editingLink.type} 
+                  onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}
+                >
+                  <option value="gold">Dourado</option>
+                  <option value="neon-purple">Roxo</option>
+                  <option value="neon-green">Verde</option>
+                  <option value="glass">Simples</option>
+                </select>
+                <select 
+                  className="w-full p-4 rounded-xl text-sm" 
+                  value={editingLink.icon} 
+                  onChange={e => setEditingLink({...editingLink, icon: e.target.value as any})}
+                >
+                  {Object.keys(Icons).map(i => <option key={i} value={i}>{i.toUpperCase()}</option>)}
+                </select>
               </div>
             </div>
 
-            <div className="flex gap-3 pt-6">
-              <button type="submit" disabled={loading} className="flex-1 py-4 gold-gradient text-black font-bold rounded-xl active:scale-95 transition-all shadow-lg">
-                {loading ? 'PROCESSANDO...' : 'SALVAR ALTERAÇÕES'}
+            <div className="flex gap-3 pt-4">
+              <button type="submit" disabled={loading} className="flex-1 py-4 gold-gradient text-black font-bold rounded-xl shadow-lg">
+                {loading ? 'SALVANDO...' : 'SALVAR'}
               </button>
-              <button type="button" onClick={() => setEditingLink(null)} className="px-6 py-4 bg-white/5 hover:bg-white/10 rounded-xl text-sm font-bold transition-colors">
-                CANCELAR
+              <button type="button" onClick={() => setEditingLink(null)} className="px-6 py-4 bg-white/5 rounded-xl">
+                FECHAR
               </button>
             </div>
           </form>
