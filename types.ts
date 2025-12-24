@@ -7,9 +7,8 @@ export interface CasinoLink {
   type: 'gold' | 'neon-purple' | 'neon-green' | 'glass';
   icon: string;
   badge?: string;
-  category?: string; // Campo para organizar por "Páginas" ou categorias
   position: number;
-  click_count?: number;
+  click_count?: number; // Contador de acessos
   is_highlighted: boolean;
   created_at?: string;
 }

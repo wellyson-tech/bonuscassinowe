@@ -11,9 +11,10 @@ interface Props {
 
 const LinkButton: React.FC<Props> = ({ link, isAdminView = false }) => {
   const handleLinkClick = async () => {
-    if (isAdminView) return;
+    if (isAdminView) return; // Não conta cliques do admin
 
     try {
+      // Incremento simples no banco de dados
       const { error } = await supabase
         .from('links')
         .update({ click_count: (link.click_count || 0) + 1 })
@@ -41,43 +42,26 @@ const LinkButton: React.FC<Props> = ({ link, isAdminView = false }) => {
 
   const renderIcon = () => {
     const isAuto = !link.icon || link.icon === 'auto';
-    const containerClasses = `relative w-12 h-12 flex items-center justify-center rounded-2xl p-2.5 transition-all shadow-inner border overflow-hidden ${
-      link.type === 'gold' ? 'bg-black/10 border-black/20 text-black' : 'bg-white/10 border-white/10 text-white'
-    }`;
-
     if (isAuto) {
       try {
         const cleanUrl = link.url.trim();
         const urlWithProtocol = cleanUrl.startsWith('http') ? cleanUrl : `https://${cleanUrl}`;
         const domain = new URL(urlWithProtocol).hostname;
         const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
-        
         return (
-          <div className={containerClasses}>
+          <div className="relative w-12 h-12 flex items-center justify-center bg-white/10 rounded-2xl p-2 border border-white/10 overflow-hidden group-hover:border-white/30 transition-all shadow-inner">
             <img src={faviconUrl} alt={link.title} className="w-full h-full object-contain filter drop-shadow-md brightness-110" onError={(e) => {
               const target = e.target as HTMLImageElement;
               target.style.display = 'none';
-              if (target.parentElement) target.parentElement.innerHTML = '<div class="w-8 h-8 opacity-40">' + (Icons.slots as any) + '</div>';
+              if (target.parentElement) target.parentElement.innerHTML = '<div class="w-8 h-8 opacity-40">' + (Icons.chip as any) + '</div>';
             }} />
           </div>
         );
       } catch (e) {
-        return <div className={containerClasses}><div className="w-8 h-8 opacity-40">{Icons.slots}</div></div>;
+        return <div className="w-10 h-10 opacity-30">{Icons.chip}</div>;
       }
     }
-    
-    // Explicitly check for key in Icons object
-    const iconKey = link.icon.toLowerCase();
-    const iconElement = Icons[iconKey] || Icons.slots;
-
-    return (
-      <div className={containerClasses}>
-        <div className="absolute inset-0 bg-white/5 blur-sm opacity-50"></div>
-        <div className="relative w-full h-full flex items-center justify-center scale-110">
-          {iconElement}
-        </div>
-      </div>
-    );
+    return <div className={`w-10 h-10 ${link.type === 'gold' ? 'text-black' : 'text-white'}`}>{Icons[link.icon] || Icons.chip}</div>;
   };
 
   return (
@@ -88,6 +72,7 @@ const LinkButton: React.FC<Props> = ({ link, isAdminView = false }) => {
       onClick={handleLinkClick}
       className={`relative w-full p-4 rounded-[1.8rem] flex items-center gap-5 group overflow-hidden border-b-4 ${getStyleClasses()}`}
     >
+      {/* Badge de Cliques visível para Admin */}
       {isAdminView && (
         <div className="absolute top-2 right-4 flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2 py-1 rounded-full border border-white/10 z-20">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
