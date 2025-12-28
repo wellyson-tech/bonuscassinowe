@@ -14,9 +14,11 @@ const AdminPanel: React.FC = () => {
   const [activeAdminTab, setActiveAdminTab] = useState<string>('');
   const [isSettingsMode, setIsSettingsMode] = useState(false);
   const [savingBrand, setSavingBrand] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingBg, setUploadingBg] = useState(false);
   
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const bgInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchLinks();
@@ -31,6 +33,7 @@ const AdminPanel: React.FC = () => {
           name: data.name,
           tagline: data.tagline,
           logoUrl: data.logo_url,
+          backgroundUrl: data.background_url,
           verified: data.verified
         });
       }
@@ -64,17 +67,18 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'background') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setUploading(true);
+    if (type === 'logo') setUploadingLogo(true);
+    else setUploadingBg(true);
+
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `logo-${Math.random()}.${fileExt}`;
+      const fileName = `${type}-${Math.random()}.${fileExt}`;
       const filePath = `${fileName}`;
 
-      // Certifique-se de criar um bucket chamado 'brand' no Supabase e deixá-lo PÚBLICO
       const { error: uploadError } = await supabase.storage
         .from('brand')
         .upload(filePath, file);
@@ -85,12 +89,15 @@ const AdminPanel: React.FC = () => {
         .from('brand')
         .getPublicUrl(filePath);
 
-      setBrand(prev => ({ ...prev, logoUrl: publicUrl }));
-      alert("✅ Imagem enviada com sucesso! Não esqueça de Salvar a Identidade abaixo.");
+      if (type === 'logo') setBrand(prev => ({ ...prev, logoUrl: publicUrl }));
+      else setBrand(prev => ({ ...prev, backgroundUrl: publicUrl }));
+
+      alert(`✅ ${type === 'logo' ? 'Logo' : 'Fundo'} enviado! Salve as alterações no final da página.`);
     } catch (err: any) {
-      alert("Erro no upload: " + err.message + "\n\nCertifique-se de que criou um bucket chamado 'brand' no Storage do Supabase e o definiu como Público.");
+      alert("Erro no upload: " + err.message);
     } finally {
-      setUploading(false);
+      setUploadingLogo(false);
+      setUploadingBg(false);
     }
   };
 
@@ -103,12 +110,13 @@ const AdminPanel: React.FC = () => {
         name: brand.name,
         tagline: brand.tagline,
         logo_url: brand.logoUrl,
+        background_url: brand.backgroundUrl,
         verified: brand.verified
       });
       if (error) throw error;
-      alert("✅ Configurações da marca atualizadas!");
+      alert("✅ Configurações salvas com sucesso!");
     } catch (err: any) {
-      alert("Erro ao salvar marca: " + err.message);
+      alert("Erro ao salvar: " + err.message);
     } finally {
       setSavingBrand(false);
     }
@@ -221,7 +229,7 @@ const AdminPanel: React.FC = () => {
             disabled={refreshing}
             className={`px-4 py-2 bg-blue-600/10 text-blue-400 border border-blue-600/20 rounded-xl text-[9px] font-black uppercase flex items-center gap-2 hover:bg-blue-600 hover:text-white transition-all ${refreshing ? 'animate-pulse opacity-50' : ''}`}
           >
-            <svg className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            <svg className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357-2H15" /></svg>
             {refreshing ? 'Atualizando...' : 'Atualizar Cliques'}
           </button>
           <button 
@@ -280,67 +288,87 @@ const AdminPanel: React.FC = () => {
         <div className="animate-fade-in space-y-8 max-w-2xl mx-auto bg-white/[0.02] p-10 rounded-[3rem] border border-white/5">
           <div className="text-center mb-8">
             <h3 className="text-xl font-black uppercase text-shimmer italic">Identidade Visual</h3>
-            <p className="text-[9px] text-gray-500 uppercase tracking-widest mt-2">Personalize sua logo e textos principais</p>
+            <p className="text-[9px] text-gray-500 uppercase tracking-widest mt-2">Personalize sua logo, fundo e textos</p>
           </div>
 
-          <form onSubmit={handleSaveBrand} className="space-y-6">
-            <div className="flex flex-col items-center gap-6 mb-8">
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                className="relative w-32 h-32 rounded-full border-2 border-dashed border-yellow-500/50 p-1 overflow-hidden bg-black cursor-pointer group hover:border-yellow-500 transition-all"
-              >
-                <img src={brand.logoUrl} className="w-full h-full object-cover rounded-full group-hover:opacity-50 transition-opacity" alt="Preview" />
-                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                   <span className="text-[10px] font-black uppercase bg-black/80 px-2 py-1 rounded">Trocar Foto</span>
-                </div>
-                {uploading && (
-                  <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
-                    <div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent animate-spin rounded-full"></div>
+          <form onSubmit={handleSaveBrand} className="space-y-10">
+            {/* Upload Logo e Background */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Logo Area */}
+              <div className="flex flex-col items-center gap-4 bg-black/40 p-6 rounded-[2.5rem] border border-white/5">
+                <label className="text-[9px] uppercase font-black text-gray-500 tracking-widest">Logo (Avatar)</label>
+                <div 
+                  onClick={() => logoInputRef.current?.click()}
+                  className="relative w-24 h-24 rounded-full border-2 border-dashed border-yellow-500/50 p-1 overflow-hidden bg-black cursor-pointer group hover:border-yellow-500 transition-all"
+                >
+                  <img src={brand.logoUrl} className="w-full h-full object-cover rounded-full group-hover:opacity-50 transition-opacity" alt="Preview" />
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                     <span className="text-[8px] font-black uppercase bg-black/80 px-2 py-1 rounded">Trocar</span>
                   </div>
-                )}
+                  {uploadingLogo && (
+                    <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
+                      <div className="w-5 h-5 border-2 border-yellow-500 border-t-transparent animate-spin rounded-full"></div>
+                    </div>
+                  )}
+                </div>
+                <input type="file" ref={logoInputRef} onChange={(e) => handleFileUpload(e, 'logo')} className="hidden" accept="image/*" />
+                <button type="button" onClick={() => logoInputRef.current?.click()} className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[8px] font-black uppercase hover:bg-white/10">Upload Logo</button>
               </div>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleFileUpload} 
-                className="hidden" 
-                accept="image/*"
-              />
-              <button 
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[9px] font-black uppercase hover:bg-white/10 transition-all"
-              >
-                {uploading ? 'Enviando...' : 'Fazer Upload da Foto'}
-              </button>
+
+              {/* Background Area */}
+              <div className="flex flex-col items-center gap-4 bg-black/40 p-6 rounded-[2.5rem] border border-white/5">
+                <label className="text-[9px] uppercase font-black text-gray-500 tracking-widest">Imagem de Fundo</label>
+                <div 
+                  onClick={() => bgInputRef.current?.click()}
+                  className="relative w-full h-24 rounded-2xl border-2 border-dashed border-blue-500/50 overflow-hidden bg-black cursor-pointer group hover:border-blue-500 transition-all"
+                >
+                  {brand.backgroundUrl ? (
+                    <img src={brand.backgroundUrl} className="w-full h-full object-cover opacity-60 group-hover:opacity-40 transition-opacity" alt="BG Preview" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-700 text-[8px] font-black uppercase">Sem Fundo</div>
+                  )}
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                     <span className="text-[8px] font-black uppercase bg-black/80 px-2 py-1 rounded">Trocar Fundo</span>
+                  </div>
+                  {uploadingBg && (
+                    <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
+                      <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent animate-spin rounded-full"></div>
+                    </div>
+                  )}
+                </div>
+                <input type="file" ref={bgInputRef} onChange={(e) => handleFileUpload(e, 'background')} className="hidden" accept="image/*" />
+                <button type="button" onClick={() => bgInputRef.current?.click()} className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[8px] font-black uppercase hover:bg-white/10">Upload Fundo</button>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-[9px] uppercase font-black text-gray-500 ml-2">Nome da Marca</label>
-              <input 
-                className="w-full p-4 rounded-2xl text-sm bg-black border border-white/10 text-white outline-none focus:border-blue-500" 
-                value={brand.name} 
-                onChange={e => setBrand({...brand, name: e.target.value})} 
-                placeholder="Nome da sua banca"
-              />
-            </div>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[9px] uppercase font-black text-gray-500 ml-2">Nome da Marca</label>
+                <input 
+                  className="w-full p-4 rounded-2xl text-sm bg-black border border-white/10 text-white outline-none focus:border-blue-500 font-bold" 
+                  value={brand.name} 
+                  onChange={e => setBrand({...brand, name: e.target.value})} 
+                  placeholder="Nome da sua banca"
+                />
+              </div>
 
-            <div className="space-y-2">
-              <label className="text-[9px] uppercase font-black text-gray-500 ml-2">Frase de Efeito (Tagline)</label>
-              <textarea 
-                className="w-full p-4 rounded-2xl text-sm bg-black border border-white/10 text-white outline-none focus:border-blue-500 min-h-[100px]" 
-                value={brand.tagline} 
-                onChange={e => setBrand({...brand, tagline: e.target.value})} 
-                placeholder="Ex: As melhores plataformas..."
-              />
+              <div className="space-y-2">
+                <label className="text-[9px] uppercase font-black text-gray-500 ml-2">Frase de Efeito (Tagline)</label>
+                <textarea 
+                  className="w-full p-4 rounded-2xl text-sm bg-black border border-white/10 text-white outline-none focus:border-blue-500 min-h-[80px]" 
+                  value={brand.tagline} 
+                  onChange={e => setBrand({...brand, tagline: e.target.value})} 
+                  placeholder="Ex: As melhores plataformas..."
+                />
+              </div>
             </div>
 
             <button 
               type="submit" 
-              disabled={savingBrand || uploading}
-              className="w-full py-5 bg-blue-600 text-white font-black rounded-2xl uppercase text-[10px] tracking-widest shadow-xl hover:bg-blue-500 transition-all disabled:opacity-50"
+              disabled={savingBrand || uploadingLogo || uploadingBg}
+              className="w-full py-6 bg-blue-600 text-white font-black rounded-[2rem] uppercase text-[11px] tracking-widest shadow-xl hover:bg-blue-500 transition-all disabled:opacity-50"
             >
-              {savingBrand ? 'Salvando...' : 'Salvar Identidade'}
+              {savingBrand ? 'Salvando Configurações...' : 'Salvar Alterações de Identidade'}
             </button>
           </form>
         </div>

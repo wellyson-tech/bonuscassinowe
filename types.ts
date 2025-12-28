@@ -18,5 +18,6 @@ export interface CasinoBrand {
   name: string;
   tagline: string;
   logoUrl: string;
+  backgroundUrl?: string;
   verified: boolean;
 }

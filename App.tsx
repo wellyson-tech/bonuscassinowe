@@ -69,6 +69,7 @@ const App: React.FC = () => {
           name: data.name,
           tagline: data.tagline,
           logoUrl: data.logo_url,
+          backgroundUrl: data.background_url,
           verified: data.verified
         });
       }
@@ -140,8 +141,15 @@ const App: React.FC = () => {
 
   const BackgroundElements = () => (
     <>
-      <div className="fixed inset-0 bg-black -z-20" />
-      <div className="fixed inset-0 pointer-events-none z-[-15]" style={{ background: `radial-gradient(800px circle at ${mousePos.x}% ${mousePos.y}%, rgba(212, 175, 55, 0.1), transparent 80%)` }} />
+      <div className="fixed inset-0 bg-black -z-30" />
+      {brand.backgroundUrl && (
+        <div 
+          className="fixed inset-0 -z-20 bg-cover bg-center bg-no-repeat opacity-40 transition-opacity duration-1000"
+          style={{ backgroundImage: `url(${brand.backgroundUrl})`, backgroundAttachment: 'fixed' }}
+        />
+      )}
+      <div className="fixed inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/90 -z-15 pointer-events-none" />
+      <div className="fixed inset-0 pointer-events-none z-[-15]" style={{ background: `radial-gradient(800px circle at ${mousePos.x}% ${mousePos.y}%, rgba(212, 175, 55, 0.08), transparent 80%)` }} />
       <div className="scanner-beam" />
     </>
   );
