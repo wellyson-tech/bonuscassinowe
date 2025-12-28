@@ -56,7 +56,8 @@ const LinkButton: React.FC<Props> = ({ link, isAdminView = false }) => {
         const cleanUrl = link.url.trim();
         const urlWithProtocol = cleanUrl.startsWith('http') ? cleanUrl : `https://${cleanUrl}`;
         const domain = new URL(urlWithProtocol).hostname;
-        const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+        // Utilizando a API do DuckDuckGo conforme solicitado pelo usuário
+        const faviconUrl = `https://icons.duckduckgo.com/ip3/${domain}.ico`;
         
         return (
           <div className={containerClasses}>
