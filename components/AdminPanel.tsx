@@ -277,19 +277,30 @@ const AdminPanel: React.FC = () => {
                 </button>
               </div>
 
-              {/* SELECTOR DE EFEITOS NO ADMIN */}
+              {/* SELECTOR DE EFEITOS NO ADMIN - BIBLIOTECA COMPLETA */}
               <div className="space-y-2">
-                <label className="text-[9px] uppercase font-black text-gray-500 ml-2">Efeito Visual de Fundo</label>
+                <label className="text-[9px] uppercase font-black text-gray-500 ml-2">Galeria de Atmosferas (Efeitos)</label>
                 <select 
                   className="w-full p-4 rounded-2xl text-sm bg-black border border-white/10 text-white font-bold uppercase"
                   value={brand.effect || 'scanner'}
                   onChange={e => setBrand({...brand, effect: e.target.value as any})}
                 >
-                  <option value="scanner">🔦 Scanner Master (Luz Passante)</option>
-                  <option value="gold-rain">✨ Chuva de Ouro (Partículas)</option>
-                  <option value="cyber-grid">🌐 Cyber Grid (Grade 3D)</option>
-                  <option value="nebula">🌌 Nebula Glow (Aurora)</option>
-                  <option value="none">🚫 Vazio Absoluto (Sem Efeito)</option>
+                  <optgroup label="Simples & Elegantes">
+                    <option value="scanner">🔦 Scanner Master (Luz Passante)</option>
+                    <option value="none">🚫 Vazio Absoluto (Fundo Limpo)</option>
+                  </optgroup>
+                  <optgroup label="Dinâmicos">
+                    <option value="gold-rain">✨ Chuva de Ouro (Riqueza)</option>
+                    <option value="cyber-grid">🌐 Cyber Grid (Hitech)</option>
+                    <option value="nebula">🌌 Nebula Glow (Aurora Neon)</option>
+                  </optgroup>
+                  <optgroup label="Fantásticos & Master">
+                    <option value="matrix">💻 Matrix Rain (Code Blue)</option>
+                    <option value="fire">🔥 Fire Storm (Brasas Reais)</option>
+                    <option value="money">💰 Money Storm (Chuva de Grana)</option>
+                    <option value="space">🚀 Space Warp (Viagem Estelar)</option>
+                    <option value="aurora">🌈 Aurora Dream (Luzes Nórdicas)</option>
+                  </optgroup>
                 </select>
               </div>
 
@@ -310,13 +321,13 @@ const AdminPanel: React.FC = () => {
             </div>
 
             <button type="submit" disabled={savingBrand} className="w-full py-6 bg-blue-600 text-white font-black rounded-2xl uppercase text-[11px] tracking-widest shadow-xl">
-              {savingBrand ? 'Salvando...' : 'Salvar Todas as Configurações'}
+              {savingBrand ? 'Salvando...' : 'Salvar Configurações Master'}
             </button>
           </form>
         </div>
       )}
 
-      {/* MODAL EDITOR: LINKS */}
+      {/* MODAL EDITORES (MANTIDOS) */}
       {editingLink && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-[9999] overflow-y-auto">
           <form onSubmit={handleSaveLink} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-xl my-auto space-y-6">

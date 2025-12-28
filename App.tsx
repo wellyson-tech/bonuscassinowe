@@ -140,40 +140,56 @@ const App: React.FC = () => {
     }, 300);
   };
 
-  const BackgroundElements = () => (
-    <>
-      <div className="fixed inset-0 bg-black -z-30" />
-      {brand.backgroundUrl && (
-        <div 
-          className="fixed inset-0 -z-20 bg-cover bg-center bg-no-repeat opacity-40 transition-opacity duration-1000"
-          style={{ backgroundImage: `url(${brand.backgroundUrl})`, backgroundAttachment: 'fixed' }}
-        />
-      )}
-      
-      {/* DINAMIC EFFECTS */}
-      {brand.effect === 'scanner' && <div className="scanner-beam" />}
-      {brand.effect === 'gold-rain' && (
-        <div className="gold-rain-container">
-          {Array.from({ length: 30 }).map((_, i) => (
-            <div 
-              key={i} 
-              className="gold-particle" 
-              style={{ 
-                left: `${Math.random() * 100}%`, 
-                animationDuration: `${2 + Math.random() * 3}s`,
-                animationDelay: `${Math.random() * 5}s`
-              }} 
-            />
-          ))}
-        </div>
-      )}
-      {brand.effect === 'cyber-grid' && <div className="cyber-grid" />}
-      {brand.effect === 'nebula' && <div className="nebula-glow" />}
+  const BackgroundElements = () => {
+    const effect = brand.effect || 'scanner';
+    
+    return (
+      <div className="effect-container">
+        <div className="fixed inset-0 bg-black -z-30" />
+        {brand.backgroundUrl && (
+          <div 
+            className="fixed inset-0 -z-20 bg-cover bg-center bg-no-repeat opacity-40 transition-opacity duration-1000"
+            style={{ backgroundImage: `url(${brand.backgroundUrl})`, backgroundAttachment: 'fixed' }}
+          />
+        )}
+        
+        {/* DINAMIC EFFECTS RENDERER */}
+        {effect === 'scanner' && <div className="scanner-beam" />}
+        
+        {effect === 'gold-rain' && Array.from({ length: 40 }).map((_, i) => (
+          <div key={i} className="gold-particle" style={{ left: `${Math.random() * 100}%`, animationDuration: `${2 + Math.random() * 3}s`, animationDelay: `${Math.random() * 5}s` }} />
+        ))}
 
-      <div className="fixed inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/90 -z-15 pointer-events-none" />
-      <div className="fixed inset-0 pointer-events-none z-[-15]" style={{ background: `radial-gradient(800px circle at ${mousePos.x}% ${mousePos.y}%, rgba(212, 175, 55, 0.08), transparent 80%)` }} />
-    </>
-  );
+        {effect === 'matrix' && Array.from({ length: 30 }).map((_, i) => (
+          <div key={i} className="matrix-column" style={{ left: `${(i * 3.3)}%`, animationDuration: `${3 + Math.random() * 5}s`, animationDelay: `${Math.random() * 5}s` }}>
+            {Array.from({ length: 20 }).map(() => String.fromCharCode(0x30A0 + Math.random() * 96)).join('')}
+          </div>
+        ))}
+
+        {effect === 'fire' && Array.from({ length: 50 }).map((_, i) => (
+          <div key={i} className="fire-ember" style={{ left: `${Math.random() * 100}%`, animationDuration: `${3 + Math.random() * 4}s`, animationDelay: `${Math.random() * 5}s`, width: `${2 + Math.random() * 4}px` }} />
+        ))}
+
+        {effect === 'money' && Array.from({ length: 20 }).map((_, i) => (
+          <div key={i} className="money-item" style={{ left: `${Math.random() * 100}%`, animationDuration: `${4 + Math.random() * 6}s`, animationDelay: `${Math.random() * 8}s` }}>
+            {['💵', '💰', '🎰', '💎', '🪙'][Math.floor(Math.random() * 5)]}
+          </div>
+        ))}
+
+        {effect === 'space' && Array.from({ length: 100 }).map((_, i) => (
+          <div key={i} className="star" style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%`, animationDuration: `${1 + Math.random() * 3}s`, animationDelay: `${Math.random() * 5}s` }} />
+        ))}
+
+        {effect === 'aurora' && <><div className="aurora-layer" style={{ top: '10%' }} /><div className="aurora-layer" style={{ top: '30%', animationDelay: '-10s', opacity: 0.5 }} /></>}
+        
+        {effect === 'cyber-grid' && <div className="cyber-grid" />}
+        {effect === 'nebula' && <div className="nebula-glow" />}
+
+        <div className="fixed inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/90 -z-15 pointer-events-none" />
+        <div className="fixed inset-0 pointer-events-none z-[-15]" style={{ background: `radial-gradient(800px circle at ${mousePos.x}% ${mousePos.y}%, rgba(212, 175, 55, 0.08), transparent 80%)` }} />
+      </div>
+    );
+  };
 
   if (initializing) return null;
   if (view === 'admin') return <AdminPanel />;
