@@ -1,21 +1,21 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from './lib/supabase';
-import { BRAND as DEFAULT_BRAND, SOCIAL_LINKS, ADMIN_UID, Icons } from './constants';
+import { BRAND as DEFAULT_BRAND, ADMIN_UID, Icons } from './constants';
 import LinkButton from './components/LinkButton';
 import AdminPanel from './components/AdminPanel';
-import { CasinoLink, CasinoBrand } from './types';
+import { CasinoLink, CasinoBrand, SocialLink } from './types';
 
 const App: React.FC = () => {
   const [view, setView] = useState<'public' | 'login' | 'admin'>('public');
   const [links, setLinks] = useState<CasinoLink[]>([]);
+  const [socials, setSocials] = useState<SocialLink[]>([]);
   const [brand, setBrand] = useState<CasinoBrand>(DEFAULT_BRAND);
   const [activeCategory, setActiveCategory] = useState<string>('');
   const [initializing, setInitializing] = useState(true);
   const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
   const [isTransitioning, setIsTransitioning] = useState(false);
   
-  // Login State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
@@ -25,7 +25,6 @@ const App: React.FC = () => {
     const handleNavigation = async () => {
       const hash = window.location.hash;
       const { data: { session } } = await supabase.auth.getSession();
-
       if (hash === '#/admin-secret') {
         if (session && session.user.id === ADMIN_UID) setView('admin');
         else setView('login');
@@ -37,7 +36,7 @@ const App: React.FC = () => {
     const initApp = async () => {
       try {
         await handleNavigation();
-        await Promise.all([fetchLinks(), fetchBrand()]);
+        await Promise.all([fetchLinks(), fetchBrand(), fetchSocials()]);
       } catch (e) {
         console.error("Erro na inicialização:", e);
       } finally {
@@ -70,12 +69,18 @@ const App: React.FC = () => {
           tagline: data.tagline,
           logoUrl: data.logo_url,
           backgroundUrl: data.background_url,
-          verified: data.verified
+          verified: data.verified,
+          footerText: data.footer_text
         });
       }
-    } catch (e) {
-      console.warn("Usando marca padrão.");
-    }
+    } catch (e) {}
+  };
+
+  const fetchSocials = async () => {
+    try {
+      const { data } = await supabase.from('social_links').select('*').order('position', { ascending: true });
+      if (data) setSocials(data);
+    } catch (e) {}
   };
 
   const fetchLinks = async () => {
@@ -89,28 +94,23 @@ const App: React.FC = () => {
         setLinks(data);
         const cats = Array.from(new Set(data.map(l => l.category || 'Página 1')));
         if (cats.length > 0) {
-          if (!activeCategory || !cats.includes(activeCategory)) {
-            setActiveCategory(cats[0]);
-          }
+          if (!activeCategory || !cats.includes(activeCategory)) setActiveCategory(cats[0]);
         }
       }
-    } catch (e) {
-      console.warn("Links carregados offline.");
-    }
+    } catch (e) {}
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginLoading(true);
     setLoginError(null);
-
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       if (data.user?.id === ADMIN_UID) setView('admin');
       else {
         await supabase.auth.signOut();
-        setLoginError('Acesso negado: UID não autorizado.');
+        setLoginError('Acesso negado.');
       }
     } catch (err: any) {
       setLoginError('Credenciais inválidas');
@@ -161,11 +161,11 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-black relative overflow-hidden">
         <BackgroundElements />
-        <div className="w-full max-w-sm glass-card p-10 rounded-[3.5rem] text-center z-10 border border-white/10 animate-fade-in shadow-2xl">
+        <div className="w-full max-w-sm glass-card p-10 rounded-[3.5rem] text-center z-10 border border-white/10">
           <h2 className="text-3xl font-black uppercase text-shimmer tracking-tighter italic mb-10">Admin Login</h2>
           <form onSubmit={handleLogin} className="space-y-5">
-            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white text-sm outline-none focus:border-yellow-500" placeholder="E-mail" />
-            <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white text-sm outline-none focus:border-yellow-500 font-mono" placeholder="Senha" />
+            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white outline-none focus:border-yellow-500" placeholder="E-mail" />
+            <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white outline-none focus:border-yellow-500 font-mono" placeholder="Senha" />
             {loginError && <p className="text-[10px] text-red-500 uppercase font-black">{loginError}</p>}
             <button type="submit" disabled={loginLoading} className="w-full py-5 bg-yellow-500 text-black font-black rounded-2xl uppercase text-[11px] tracking-widest">{loginLoading ? 'Carregando...' : 'Acessar Painel'}</button>
           </form>
@@ -179,9 +179,8 @@ const App: React.FC = () => {
       <BackgroundElements />
       
       <main className="relative z-10 max-w-lg mx-auto px-6 py-16 flex flex-col items-center">
-        {/* Profile Header */}
         <header className="text-center mb-12 w-full flex flex-col items-center">
-          <div className="relative mb-8 group">
+          <div className="relative mb-8">
             <div className="absolute inset-0 bg-yellow-500/30 blur-[70px] rounded-full scale-110"></div>
             <div className="w-32 h-32 p-1 rounded-full bg-gradient-to-br from-yellow-200 via-yellow-600 to-yellow-300 relative animate-float shadow-2xl overflow-hidden">
               <img src={brand.logoUrl} className="w-full h-full rounded-full object-cover border-[5px] border-black" alt={brand.name} />
@@ -202,12 +201,11 @@ const App: React.FC = () => {
           </div>
         </header>
 
-        {/* Categories Tab Bar */}
         {categories.length > 1 && (
           <nav className="w-full mb-12 sticky top-4 z-50 px-2">
             <div className="glass-card p-2 rounded-[2.5rem] flex items-center justify-between border border-white/5 shadow-2xl overflow-hidden relative">
               <div 
-                className="absolute h-[calc(100%-16px)] bg-yellow-500 rounded-[2rem] transition-all duration-500 ease-out z-0"
+                className="absolute h-[calc(100%-16px)] bg-yellow-500 rounded-[2rem] transition-all duration-500 z-0"
                 style={{
                   width: `${100 / categories.length}%`,
                   left: `${(categories.indexOf(activeCategory || categories[0]) * (100 / categories.length))}%`,
@@ -229,48 +227,27 @@ const App: React.FC = () => {
           </nav>
         )}
 
-        {/* Content Area */}
         <div className={`w-full space-y-6 mb-16 transition-all duration-300 min-h-[400px] ${isTransitioning ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
-          {filteredLinks.length > 0 ? (
-            filteredLinks.map((link, idx) => (
-              <div key={link.id} className="animate-fade-in-up" style={{ animationDelay: `${idx * 0.1}s` }}>
-                <LinkButton link={link} />
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-32 bg-white/[0.02] border border-dashed border-white/5 rounded-[4rem] opacity-30">
-              <p className="text-[11px] uppercase font-black tracking-[0.5em]">Conteúdo em breve</p>
+          {filteredLinks.map((link, idx) => (
+            <div key={link.id} className="animate-fade-in-up" style={{ animationDelay: `${idx * 0.1}s` }}>
+              <LinkButton link={link} />
             </div>
-          )}
+          ))}
         </div>
 
-        {/* Footer */}
         <footer className="w-full text-center space-y-12">
           <div className="flex justify-center gap-6">
-            {SOCIAL_LINKS.map((social) => (
-              <a key={social.name} href={social.url} target="_blank" rel="noopener noreferrer" className="w-16 h-16 flex items-center justify-center rounded-[2rem] bg-white/5 border border-white/10 hover:border-yellow-500/50 text-white transition-all hover:-translate-y-2">
+            {socials.map((social) => (
+              <a key={social.id} href={social.url} target="_blank" rel="noopener noreferrer" className="w-16 h-16 flex items-center justify-center rounded-[2rem] bg-white/5 border border-white/10 hover:border-yellow-500/50 text-white transition-all hover:-translate-y-2">
                 <div className="w-7 h-7">{Icons[social.icon] || social.name.charAt(0)}</div>
               </a>
             ))}
           </div>
           <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.4em]">
-            {brand.name} &copy; 2025
+            {brand.footerText || `${brand.name} © 2025`}
           </p>
         </footer>
       </main>
-
-      <style>{`
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(30px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in-up { animation: fadeInUp 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
-        @keyframes fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
-      `}</style>
     </div>
   );
 };

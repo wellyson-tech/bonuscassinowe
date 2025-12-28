@@ -7,11 +7,19 @@ export interface CasinoLink {
   type: 'gold' | 'neon-purple' | 'neon-green' | 'glass';
   icon: string;
   badge?: string;
-  category?: string; // Campo para organizar por "Páginas" ou categorias
+  category?: string;
   position: number;
   click_count?: number;
   is_highlighted: boolean;
   created_at?: string;
+}
+
+export interface SocialLink {
+  id?: string;
+  name: string;
+  url: string;
+  icon: string;
+  position: number;
 }
 
 export interface CasinoBrand {
@@ -20,4 +28,5 @@ export interface CasinoBrand {
   logoUrl: string;
   backgroundUrl?: string;
   verified: boolean;
+  footerText?: string;
 }
