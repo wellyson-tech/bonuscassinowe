@@ -57,13 +57,67 @@ const AdminPanel: React.FC = () => {
       const { data } = await supabase.from('links').select('*').order('position', { ascending: true });
       if (data) {
         setLinks(data);
-        if (data.length > 0 && !activeAdminPage) {
-          const cats = Array.from(new Set(data.map(l => l.category || 'Página 1')));
-          setActiveAdminPage(cats[0]);
+        const uniqueCats = Array.from(new Set(data.map(l => l.category || 'Página 1')));
+        if (uniqueCats.length > 0 && !activeAdminPage) {
+          setActiveAdminPage(uniqueCats[0]);
         } else if (!activeAdminPage) setActiveAdminPage('Página 1');
       }
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  // --- LÓGICA DE MOVIMENTAÇÃO DE LINKS ---
+  const moveLink = async (id: string, direction: 'up' | 'down') => {
+    const currentIdx = links.findIndex(l => l.id === id);
+    if (currentIdx === -1) return;
+
+    const targetIdx = direction === 'up' ? currentIdx - 1 : currentIdx + 1;
+    if (targetIdx < 0 || targetIdx >= links.length) return;
+
+    const currentLink = links[currentIdx];
+    const targetLink = links[targetIdx];
+
+    // Swapping positions
+    const { error } = await supabase.from('links').upsert([
+      { id: currentLink.id, position: targetLink.position },
+      { id: targetLink.id, position: currentLink.position }
+    ]);
+
+    if (!error) fetchLinks();
+  };
+
+  // --- LÓGICA DE MOVIMENTAÇÃO DE PÁGINAS (CATEGORIAS) ---
+  const moveCategory = async (category: string, direction: 'left' | 'right') => {
+    const categoriesOrder = Array.from(new Set(links.map(l => l.category || 'Página 1')));
+    const currentIdx = categoriesOrder.indexOf(category);
+    if (currentIdx === -1) return;
+
+    const targetIdx = direction === 'left' ? currentIdx - 1 : currentIdx + 1;
+    if (targetIdx < 0 || targetIdx >= categoriesOrder.length) return;
+
+    const targetCategory = categoriesOrder[targetIdx];
+    
+    // Pegar todos os links das duas categorias envolvidas
+    const currentCatLinks = links.filter(l => (l.category || 'Página 1') === category);
+    const targetCatLinks = links.filter(l => (l.category || 'Página 1') === targetCategory);
+
+    // Calcular novo bloco de posições
+    // Simplificando: vamos apenas trocar as categorias dos links para trocar a ordem visual mantendo a estrutura
+    // Mas o jeito mais robusto é trocar as ordens de posição
+    const minPos = Math.min(...currentCatLinks.map(l => l.position), ...targetCatLinks.map(l => l.position));
+    
+    // Criar payload de atualização: links da cat atual ganham posições da target e vice-versa
+    // Por simplicidade na implementação BioLink, vamos apenas inverter as strings de categoria
+    const updates = [
+      ...currentCatLinks.map(l => ({ id: l.id, category: targetCategory })),
+      ...targetCatLinks.map(l => ({ id: l.id, category: category }))
+    ];
+
+    const { error } = await supabase.from('links').upsert(updates);
+    if (!error) {
+      setActiveAdminPage(direction === 'left' ? targetCategory : category); // Manter foco na aba
+      fetchLinks();
     }
   };
 
@@ -118,7 +172,7 @@ const AdminPanel: React.FC = () => {
         name: editingSocial.name || 'Social',
         url: editingSocial.url || '',
         icon: editingSocial.icon || 'instagram',
-        position: socials.length
+        position: editingSocial.position ?? socials.length
       };
       if (editingSocial.id) await supabase.from('social_links').update(payload).eq('id', editingSocial.id);
       else await supabase.from('social_links').insert([payload]);
@@ -159,6 +213,7 @@ const AdminPanel: React.FC = () => {
     table === 'links' ? fetchLinks() : fetchSocials();
   };
 
+  const uniqueCategories = useMemo(() => Array.from(new Set(links.map(l => l.category || 'Página 1'))), [links]);
   const filteredLinks = useMemo(() => links.filter(l => (l.category || 'Página 1') === activeAdminPage), [links, activeAdminPage]);
 
   return (
@@ -169,7 +224,7 @@ const AdminPanel: React.FC = () => {
           <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter">CENTRAL DE CONTROLE</h2>
           <div className="flex items-center gap-2 mt-2">
              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-             <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black">Sistema Online - v3.0 Master</p>
+             <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black">Sistema Online - v4.0 Pro</p>
           </div>
         </div>
         <button onClick={() => { supabase.auth.signOut(); window.location.reload(); }} className="px-6 py-2 bg-white/5 text-red-500 border border-red-500/20 rounded-xl text-[9px] font-black uppercase hover:bg-red-600 hover:text-white transition-all">Sair</button>
@@ -193,28 +248,57 @@ const AdminPanel: React.FC = () => {
       {/* VIEW: LINKS */}
       {activeMenu === 'links' && (
         <div className="animate-fade-in space-y-8">
-          <div className="flex flex-wrap gap-2 p-2 bg-white/[0.02] border border-white/5 rounded-[2.2rem]">
-            {Array.from(new Set(links.map(l => l.category || 'Página 1'))).concat(activeAdminPage).filter((v, i, a) => a.indexOf(v) === i).map(cat => (
-              <button key={cat} onClick={() => setActiveAdminPage(cat)} className={`px-6 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${activeAdminPage === cat ? 'bg-white text-black' : 'text-gray-500 hover:text-white'}`}>{cat}</button>
+          {/* SELETOR DE PÁGINAS COM REORDENAÇÃO */}
+          <div className="flex flex-wrap gap-2 p-3 bg-white/[0.02] border border-white/5 rounded-[2.2rem] items-center">
+            {uniqueCategories.map((cat, idx) => (
+              <div key={cat} className="flex items-center bg-black/40 rounded-full border border-white/5 overflow-hidden">
+                <button 
+                  onClick={() => setActiveAdminPage(cat)} 
+                  className={`px-6 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeAdminPage === cat ? 'bg-white text-black' : 'text-gray-500 hover:text-white'}`}
+                >
+                  {cat}
+                </button>
+                <div className="flex border-l border-white/5 bg-black/60">
+                  <button 
+                    disabled={idx === 0} 
+                    onClick={() => moveCategory(cat, 'left')} 
+                    className="px-2 py-3 text-[10px] hover:text-yellow-500 disabled:opacity-20"
+                  >←</button>
+                  <button 
+                    disabled={idx === uniqueCategories.length - 1} 
+                    onClick={() => moveCategory(cat, 'right')} 
+                    className="px-2 py-3 text-[10px] hover:text-yellow-500 disabled:opacity-20"
+                  >→</button>
+                </div>
+              </div>
             ))}
-            <button onClick={() => { const n = prompt("Nome da página:"); if(n) setActiveAdminPage(n); }} className="px-4 py-3 text-yellow-500 text-[10px] font-black uppercase tracking-widest">+ Nova Página</button>
+            <button onClick={() => { const n = prompt("Nome da página:"); if(n) setActiveAdminPage(n); }} className="px-4 py-3 text-yellow-500 text-[10px] font-black uppercase tracking-widest hover:bg-yellow-500/10 rounded-full">+ Nova Página</button>
           </div>
 
           <button onClick={() => setEditingLink({ category: activeAdminPage, description: 'SAQUE MÍNIMO COM BÔNUS', type: 'glass', icon: 'auto' })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">+ Adicionar Plataforma em "{activeAdminPage}"</button>
 
+          {/* LISTA DE LINKS COM REORDENAÇÃO ↑ ↓ */}
           <div className="space-y-4">
-            {filteredLinks.map(link => (
-              <div key={link.id} className="bg-[#0f0f0f] p-5 rounded-[2rem] flex items-center justify-between border border-white/5">
+            {filteredLinks.map((link, idx) => (
+              <div key={link.id} className="bg-[#0f0f0f] p-5 rounded-[2rem] flex items-center justify-between border border-white/5 group">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center border border-white/10 text-yellow-500">{Icons[link.icon || 'slots'] || Icons.slots}</div>
+                  {/* Controles de Posição Individual */}
+                  <div className="flex flex-col gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => moveLink(link.id!, 'up')} disabled={idx === 0} className="w-6 h-6 bg-white/5 rounded flex items-center justify-center text-[10px] hover:bg-yellow-500 hover:text-black disabled:opacity-10">▲</button>
+                    <button onClick={() => moveLink(link.id!, 'down')} disabled={idx === filteredLinks.length - 1} className="w-6 h-6 bg-white/5 rounded flex items-center justify-center text-[10px] hover:bg-yellow-500 hover:text-black disabled:opacity-10">▼</button>
+                  </div>
+                  
+                  <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center border border-white/10 text-yellow-500">
+                    {Icons[link.icon || 'slots'] || Icons.slots}
+                  </div>
                   <div>
                     <h4 className="font-bold text-sm uppercase">{link.title}</h4>
-                    <p className="text-[9px] text-gray-500 uppercase font-black">{link.click_count || 0} Cliques • Estilo: {link.type}</p>
+                    <p className="text-[9px] text-gray-500 uppercase font-black">{link.click_count || 0} Cliques • Ordem: {link.position}</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => setEditingLink(link)} className="w-10 h-10 bg-white/5 flex items-center justify-center rounded-lg">⚙️</button>
-                  <button onClick={() => handleDelete('links', link.id!)} className="w-10 h-10 bg-red-600/10 text-red-500 flex items-center justify-center rounded-lg">🗑️</button>
+                  <button onClick={() => setEditingLink(link)} className="w-10 h-10 bg-white/5 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors">⚙️</button>
+                  <button onClick={() => handleDelete('links', link.id!)} className="w-10 h-10 bg-red-600/10 text-red-500 flex items-center justify-center rounded-lg hover:bg-red-600 hover:text-white transition-colors">🗑️</button>
                 </div>
               </div>
             ))}
@@ -277,7 +361,6 @@ const AdminPanel: React.FC = () => {
                 </button>
               </div>
 
-              {/* SELECTOR DE EFEITOS NO ADMIN - BIBLIOTECA COMPLETA */}
               <div className="space-y-2">
                 <label className="text-[9px] uppercase font-black text-gray-500 ml-2">Galeria de Atmosferas (Efeitos)</label>
                 <select 
@@ -327,7 +410,7 @@ const AdminPanel: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL EDITORES (MANTIDOS) */}
+      {/* MODAL EDITORES */}
       {editingLink && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-[9999] overflow-y-auto">
           <form onSubmit={handleSaveLink} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-xl my-auto space-y-6">
