@@ -70,7 +70,8 @@ const App: React.FC = () => {
           logoUrl: data.logo_url,
           backgroundUrl: data.background_url,
           verified: data.verified,
-          footerText: data.footer_text
+          footerText: data.footer_text,
+          effect: data.effect || 'scanner'
         });
       }
     } catch (e) {}
@@ -148,9 +149,29 @@ const App: React.FC = () => {
           style={{ backgroundImage: `url(${brand.backgroundUrl})`, backgroundAttachment: 'fixed' }}
         />
       )}
+      
+      {/* DINAMIC EFFECTS */}
+      {brand.effect === 'scanner' && <div className="scanner-beam" />}
+      {brand.effect === 'gold-rain' && (
+        <div className="gold-rain-container">
+          {Array.from({ length: 30 }).map((_, i) => (
+            <div 
+              key={i} 
+              className="gold-particle" 
+              style={{ 
+                left: `${Math.random() * 100}%`, 
+                animationDuration: `${2 + Math.random() * 3}s`,
+                animationDelay: `${Math.random() * 5}s`
+              }} 
+            />
+          ))}
+        </div>
+      )}
+      {brand.effect === 'cyber-grid' && <div className="cyber-grid" />}
+      {brand.effect === 'nebula' && <div className="nebula-glow" />}
+
       <div className="fixed inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/90 -z-15 pointer-events-none" />
       <div className="fixed inset-0 pointer-events-none z-[-15]" style={{ background: `radial-gradient(800px circle at ${mousePos.x}% ${mousePos.y}%, rgba(212, 175, 55, 0.08), transparent 80%)` }} />
-      <div className="scanner-beam" />
     </>
   );
 

@@ -39,7 +39,8 @@ const AdminPanel: React.FC = () => {
           logoUrl: data.logo_url,
           backgroundUrl: data.background_url,
           verified: data.verified,
-          footerText: data.footer_text
+          footerText: data.footer_text,
+          effect: data.effect || 'scanner'
         });
       }
     } catch (e) {}
@@ -98,7 +99,8 @@ const AdminPanel: React.FC = () => {
         logo_url: brand.logoUrl,
         background_url: brand.backgroundUrl,
         verified: brand.verified,
-        footer_text: brand.footerText
+        footer_text: brand.footerText,
+        effect: brand.effect
       });
       if (error) throw error;
       alert("Identidade salva!");
@@ -164,7 +166,7 @@ const AdminPanel: React.FC = () => {
       {/* Header */}
       <div className="flex justify-between items-center mb-10 border-b border-white/5 pb-8">
         <div>
-          <h2 className="text-2xl font-black text-shimmer uppercase italic italic tracking-tighter">CENTRAL DE CONTROLE</h2>
+          <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter">CENTRAL DE CONTROLE</h2>
           <div className="flex items-center gap-2 mt-2">
              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
              <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black">Sistema Online - v3.0 Master</p>
@@ -273,6 +275,22 @@ const AdminPanel: React.FC = () => {
                 <button type="button" onClick={() => setBrand({...brand, verified: !brand.verified})} className={`w-12 h-6 rounded-full transition-all relative ${brand.verified ? 'bg-green-500' : 'bg-gray-700'}`}>
                   <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${brand.verified ? 'right-1' : 'left-1'}`}></div>
                 </button>
+              </div>
+
+              {/* SELECTOR DE EFEITOS NO ADMIN */}
+              <div className="space-y-2">
+                <label className="text-[9px] uppercase font-black text-gray-500 ml-2">Efeito Visual de Fundo</label>
+                <select 
+                  className="w-full p-4 rounded-2xl text-sm bg-black border border-white/10 text-white font-bold uppercase"
+                  value={brand.effect || 'scanner'}
+                  onChange={e => setBrand({...brand, effect: e.target.value as any})}
+                >
+                  <option value="scanner">🔦 Scanner Master (Luz Passante)</option>
+                  <option value="gold-rain">✨ Chuva de Ouro (Partículas)</option>
+                  <option value="cyber-grid">🌐 Cyber Grid (Grade 3D)</option>
+                  <option value="nebula">🌌 Nebula Glow (Aurora)</option>
+                  <option value="none">🚫 Vazio Absoluto (Sem Efeito)</option>
+                </select>
               </div>
 
               <div className="space-y-2">
