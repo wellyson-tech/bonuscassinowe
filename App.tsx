@@ -13,7 +13,6 @@ const App: React.FC = () => {
   const [brand, setBrand] = useState<CasinoBrand>(DEFAULT_BRAND);
   const [activeCategory, setActiveCategory] = useState<string>('');
   const [initializing, setInitializing] = useState(true);
-  const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
   const [isTransitioning, setIsTransitioning] = useState(false);
   
   const [email, setEmail] = useState('');
@@ -44,19 +43,10 @@ const App: React.FC = () => {
       }
     };
 
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePos({
-        x: (e.clientX / window.innerWidth) * 100,
-        y: (e.clientY / window.innerHeight) * 100,
-      });
-    };
-
     initApp();
     window.addEventListener('hashchange', handleNavigation);
-    window.addEventListener('mousemove', handleMouseMove);
     return () => {
       window.removeEventListener('hashchange', handleNavigation);
-      window.removeEventListener('mousemove', handleMouseMove);
     };
   }, []);
 
@@ -186,7 +176,6 @@ const App: React.FC = () => {
         {effect === 'nebula' && <div className="nebula-glow" />}
 
         <div className="fixed inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/90 -z-15 pointer-events-none" />
-        <div className="fixed inset-0 pointer-events-none z-[-15]" style={{ background: `radial-gradient(800px circle at ${mousePos.x}% ${mousePos.y}%, rgba(212, 175, 55, 0.08), transparent 80%)` }} />
       </div>
     );
   };
