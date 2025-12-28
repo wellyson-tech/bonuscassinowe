@@ -1,14 +1,15 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from './lib/supabase';
-import { BRAND, SOCIAL_LINKS, ADMIN_UID, Icons } from './constants';
+import { BRAND as DEFAULT_BRAND, SOCIAL_LINKS, ADMIN_UID, Icons } from './constants';
 import LinkButton from './components/LinkButton';
 import AdminPanel from './components/AdminPanel';
-import { CasinoLink } from './types';
+import { CasinoLink, CasinoBrand } from './types';
 
 const App: React.FC = () => {
   const [view, setView] = useState<'public' | 'login' | 'admin'>('public');
   const [links, setLinks] = useState<CasinoLink[]>([]);
+  const [brand, setBrand] = useState<CasinoBrand>(DEFAULT_BRAND);
   const [activeCategory, setActiveCategory] = useState<string>('');
   const [initializing, setInitializing] = useState(true);
   const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
@@ -36,7 +37,7 @@ const App: React.FC = () => {
     const initApp = async () => {
       try {
         await handleNavigation();
-        await fetchLinks();
+        await Promise.all([fetchLinks(), fetchBrand()]);
       } catch (e) {
         console.error("Erro na inicialização:", e);
       } finally {
@@ -60,6 +61,22 @@ const App: React.FC = () => {
     };
   }, []);
 
+  const fetchBrand = async () => {
+    try {
+      const { data, error } = await supabase.from('brand_settings').select('*').eq('id', 1).single();
+      if (data && !error) {
+        setBrand({
+          name: data.name,
+          tagline: data.tagline,
+          logoUrl: data.logo_url,
+          verified: data.verified
+        });
+      }
+    } catch (e) {
+      console.warn("Usando marca padrão.");
+    }
+  };
+
   const fetchLinks = async () => {
     try {
       const { data, error } = await supabase
@@ -71,7 +88,6 @@ const App: React.FC = () => {
         setLinks(data);
         const cats = Array.from(new Set(data.map(l => l.category || 'Página 1')));
         if (cats.length > 0) {
-          // Mantém a categoria ativa se ela ainda existir, senão pega a primeira
           if (!activeCategory || !cats.includes(activeCategory)) {
             setActiveCategory(cats[0]);
           }
@@ -159,22 +175,22 @@ const App: React.FC = () => {
         <header className="text-center mb-12 w-full flex flex-col items-center">
           <div className="relative mb-8 group">
             <div className="absolute inset-0 bg-yellow-500/30 blur-[70px] rounded-full scale-110"></div>
-            <div className="w-32 h-32 p-1 rounded-full bg-gradient-to-br from-yellow-200 via-yellow-600 to-yellow-300 relative animate-float shadow-2xl">
-              <img src={BRAND.logoUrl} className="w-full h-full rounded-full object-cover border-[5px] border-black" alt={BRAND.name} />
+            <div className="w-32 h-32 p-1 rounded-full bg-gradient-to-br from-yellow-200 via-yellow-600 to-yellow-300 relative animate-float shadow-2xl overflow-hidden">
+              <img src={brand.logoUrl} className="w-full h-full rounded-full object-cover border-[5px] border-black" alt={brand.name} />
             </div>
           </div>
           
           <div className="flex flex-col items-center">
             <div className="flex items-center justify-center gap-3">
-              <h1 className="text-4xl font-black uppercase tracking-tighter text-shimmer italic leading-tight">{BRAND.name}</h1>
-              {BRAND.verified && (
+              <h1 className="text-4xl font-black uppercase tracking-tighter text-shimmer italic leading-tight">{brand.name}</h1>
+              {brand.verified && (
                 <div className="ig-verified-wrapper">
                   <svg viewBox="0 0 24 24" className="ig-verified-bg"><path d="M12 2L14.4 4.8L17.7 4.2L18.7 7.5L21.8 8.8L21 12L21.8 15.2L18.7 16.5L17.7 19.8L14.4 19.2L12 22L9.6 19.2L6.3 19.8L5.3 16.5L2.2 15.2L3 12L2.2 8.8L5.3 7.5L6.3 4.2L9.6 4.8L12 2Z" /></svg>
                   <svg viewBox="0 0 24 24" className="ig-verified-check"><path d="M10 15.172l9.192-9.193 1.415 1.414L10 18l-6.364-6.364 1.414-1.414z" /></svg>
                 </div>
               )}
             </div>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.6em] mt-3 opacity-60">{BRAND.tagline}</p>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.6em] mt-3 opacity-60 text-center max-w-[280px]">{brand.tagline}</p>
           </div>
         </header>
 
@@ -230,7 +246,7 @@ const App: React.FC = () => {
             ))}
           </div>
           <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.4em]">
-            {BRAND.name} &copy; 2025
+            {brand.name} &copy; 2025
           </p>
         </footer>
       </main>

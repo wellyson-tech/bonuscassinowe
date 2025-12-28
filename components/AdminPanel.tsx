@@ -1,20 +1,43 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { CasinoLink } from '../types';
-import { Icons } from '../constants';
+import { CasinoLink, CasinoBrand } from '../types';
+import { Icons, BRAND as DEFAULT_BRAND } from '../constants';
 
 const AdminPanel: React.FC = () => {
   const [links, setLinks] = useState<CasinoLink[]>([]);
+  const [brand, setBrand] = useState<CasinoBrand>(DEFAULT_BRAND);
   const [editingLink, setEditingLink] = useState<Partial<CasinoLink> | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeAdminTab, setActiveAdminTab] = useState<string>('');
+  const [isSettingsMode, setIsSettingsMode] = useState(false);
+  const [savingBrand, setSavingBrand] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchLinks();
+    fetchBrand();
   }, []);
+
+  const fetchBrand = async () => {
+    try {
+      const { data, error } = await supabase.from('brand_settings').select('*').eq('id', 1).single();
+      if (data && !error) {
+        setBrand({
+          name: data.name,
+          tagline: data.tagline,
+          logoUrl: data.logo_url,
+          verified: data.verified
+        });
+      }
+    } catch (e) {
+      console.warn("Tabela de marca não encontrada.");
+    }
+  };
 
   const fetchLinks = async () => {
     setRefreshing(true);
@@ -41,6 +64,56 @@ const AdminPanel: React.FC = () => {
     }
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `logo-${Math.random()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      // Certifique-se de criar um bucket chamado 'brand' no Supabase e deixá-lo PÚBLICO
+      const { error: uploadError } = await supabase.storage
+        .from('brand')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('brand')
+        .getPublicUrl(filePath);
+
+      setBrand(prev => ({ ...prev, logoUrl: publicUrl }));
+      alert("✅ Imagem enviada com sucesso! Não esqueça de Salvar a Identidade abaixo.");
+    } catch (err: any) {
+      alert("Erro no upload: " + err.message + "\n\nCertifique-se de que criou um bucket chamado 'brand' no Storage do Supabase e o definiu como Público.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSaveBrand = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingBrand(true);
+    try {
+      const { error } = await supabase.from('brand_settings').upsert({
+        id: 1,
+        name: brand.name,
+        tagline: brand.tagline,
+        logo_url: brand.logoUrl,
+        verified: brand.verified
+      });
+      if (error) throw error;
+      alert("✅ Configurações da marca atualizadas!");
+    } catch (err: any) {
+      alert("Erro ao salvar marca: " + err.message);
+    } finally {
+      setSavingBrand(false);
+    }
+  };
+
   const categories = useMemo(() => {
     const cats = links.map(l => l.category || 'Página 1');
     const unique = Array.from(new Set(cats));
@@ -64,7 +137,6 @@ const AdminPanel: React.FC = () => {
     const currentPos = currentLink.position;
     const targetPos = targetLink.position;
 
-    // Atualiza localmente para feedback imediato
     const newLinks = [...links];
     const idxInLinks = newLinks.findIndex(l => l.id === currentLink.id);
     const targetIdxInLinks = newLinks.findIndex(l => l.id === targetLink.id);
@@ -81,7 +153,7 @@ const AdminPanel: React.FC = () => {
       ]);
     } catch (err) {
       console.error("Erro ao reordenar:", err);
-      fetchLinks(); // Recarrega se falhar
+      fetchLinks();
     }
   };
 
@@ -163,14 +235,14 @@ const AdminPanel: React.FC = () => {
 
       {/* Seletor de Abas no Admin */}
       <div className="mb-10">
-        <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-4 block ml-2">Páginas Disponíveis:</label>
+        <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-4 block ml-2">Páginas e Ajustes:</label>
         <div className="flex flex-wrap gap-2 p-2 bg-white/[0.02] border border-white/5 rounded-[2rem]">
           {categories.map((cat) => (
             <button
               key={cat}
-              onClick={() => setActiveAdminTab(cat)}
+              onClick={() => { setIsSettingsMode(false); setActiveAdminTab(cat); }}
               className={`px-6 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
-                activeAdminTab === cat 
+                !isSettingsMode && activeAdminTab === cat 
                 ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' 
                 : 'bg-white/5 text-gray-500 hover:text-white'
               }`}
@@ -179,9 +251,22 @@ const AdminPanel: React.FC = () => {
             </button>
           ))}
           <button 
+            onClick={() => setIsSettingsMode(true)}
+            className={`px-6 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+              isSettingsMode 
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' 
+              : 'bg-white/5 text-gray-500 hover:text-white'
+            }`}
+          >
+            ⚙️ Configurações
+          </button>
+          <button 
             onClick={() => {
               const newCat = prompt("Nome da nova página:");
-              if(newCat) setActiveAdminTab(newCat);
+              if(newCat) {
+                setIsSettingsMode(false);
+                setActiveAdminTab(newCat);
+              }
             }}
             className="px-4 py-3 rounded-full text-[10px] font-black uppercase tracking-widest bg-white/5 text-yellow-500/50 hover:text-yellow-500"
           >
@@ -190,79 +275,142 @@ const AdminPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* Botão de Adição Principal */}
-      <button
-        onClick={() => {
-          setErrorMessage(null);
-          setEditingLink({ category: activeAdminTab, type: 'glass', icon: 'auto', title: '', description: 'Clique para jogar', url: '', badge: '' });
-        }}
-        className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-sm mb-12 shadow-2xl hover:scale-[1.01] transition-all active:scale-95"
-      >
-        + Novo Link em "{activeAdminTab}"
-      </button>
-
-      {/* Lista Filtrada com Contador de Cliques e Ordenação */}
-      <div className="space-y-4">
-        <div className="flex justify-between items-center mb-6 px-2">
-          <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em]">Plataformas na {activeAdminTab}</h3>
-          <span className="text-[9px] bg-white/10 px-3 py-1 rounded-full text-gray-400 font-bold">{filteredLinks.length} Links</span>
-        </div>
-        
-        {filteredLinks.length === 0 ? (
-          <div className="text-center py-20 border border-dashed border-white/5 rounded-[3rem] bg-white/[0.01]">
-            <p className="text-gray-600 uppercase text-[9px] font-black tracking-[0.5em]">Sem links cadastrados</p>
+      {isSettingsMode ? (
+        /* Seção de Configurações da Marca */
+        <div className="animate-fade-in space-y-8 max-w-2xl mx-auto bg-white/[0.02] p-10 rounded-[3rem] border border-white/5">
+          <div className="text-center mb-8">
+            <h3 className="text-xl font-black uppercase text-shimmer italic">Identidade Visual</h3>
+            <p className="text-[9px] text-gray-500 uppercase tracking-widest mt-2">Personalize sua logo e textos principais</p>
           </div>
-        ) : (
-          filteredLinks.map((link, idx) => (
-            <div key={link.id} className="bg-[#0f0f0f] p-5 rounded-[2.5rem] flex items-center justify-between border border-white/5 hover:border-white/10 transition-colors">
-              <div className="flex items-center gap-5">
-                {/* Botões de Ordenação Lateral */}
-                <div className="flex flex-col gap-1">
-                  <button 
-                    onClick={() => handleMove(idx, 'up')} 
-                    disabled={idx === 0}
-                    className={`p-1.5 rounded-lg border border-white/5 hover:bg-white/10 ${idx === 0 ? 'opacity-20 cursor-not-allowed' : 'text-yellow-500'}`}
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 15l7-7 7 7"/></svg>
-                  </button>
-                  <button 
-                    onClick={() => handleMove(idx, 'down')} 
-                    disabled={idx === filteredLinks.length - 1}
-                    className={`p-1.5 rounded-lg border border-white/5 hover:bg-white/10 ${idx === filteredLinks.length - 1 ? 'opacity-20 cursor-not-allowed' : 'text-yellow-500'}`}
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7"/></svg>
-                  </button>
-                </div>
 
-                <div className="w-14 h-14 bg-black rounded-2xl flex items-center justify-center border border-white/10 text-yellow-500">
-                  {Icons[link.icon || 'slots'] || Icons.slots}
+          <form onSubmit={handleSaveBrand} className="space-y-6">
+            <div className="flex flex-col items-center gap-6 mb-8">
+              <div 
+                onClick={() => fileInputRef.current?.click()}
+                className="relative w-32 h-32 rounded-full border-2 border-dashed border-yellow-500/50 p-1 overflow-hidden bg-black cursor-pointer group hover:border-yellow-500 transition-all"
+              >
+                <img src={brand.logoUrl} className="w-full h-full object-cover rounded-full group-hover:opacity-50 transition-opacity" alt="Preview" />
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                   <span className="text-[10px] font-black uppercase bg-black/80 px-2 py-1 rounded">Trocar Foto</span>
                 </div>
-                <div>
-                  <h4 className="font-black text-sm uppercase text-white tracking-tight">{link.title}</h4>
-                  <div className="flex items-center gap-2 mt-2 flex-wrap">
-                    <span className="text-[9px] bg-blue-500 text-white px-3 py-1 rounded-lg shadow-[0_5px_15px_rgba(59,130,246,0.3)] uppercase font-black">
-                      🖱️ {link.click_count || 0} CLIQUES
-                    </span>
-                    <span className="text-[8px] bg-white/5 text-gray-500 px-2 py-1 rounded uppercase font-black border border-white/5">
-                      Estilo: {link.type}
-                    </span>
-                    {link.badge && <span className="text-[8px] text-yellow-500 font-black px-1">● {link.badge}</span>}
+                {uploading && (
+                  <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
+                    <div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent animate-spin rounded-full"></div>
+                  </div>
+                )}
+              </div>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileUpload} 
+                className="hidden" 
+                accept="image/*"
+              />
+              <button 
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[9px] font-black uppercase hover:bg-white/10 transition-all"
+              >
+                {uploading ? 'Enviando...' : 'Fazer Upload da Foto'}
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[9px] uppercase font-black text-gray-500 ml-2">Nome da Marca</label>
+              <input 
+                className="w-full p-4 rounded-2xl text-sm bg-black border border-white/10 text-white outline-none focus:border-blue-500" 
+                value={brand.name} 
+                onChange={e => setBrand({...brand, name: e.target.value})} 
+                placeholder="Nome da sua banca"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[9px] uppercase font-black text-gray-500 ml-2">Frase de Efeito (Tagline)</label>
+              <textarea 
+                className="w-full p-4 rounded-2xl text-sm bg-black border border-white/10 text-white outline-none focus:border-blue-500 min-h-[100px]" 
+                value={brand.tagline} 
+                onChange={e => setBrand({...brand, tagline: e.target.value})} 
+                placeholder="Ex: As melhores plataformas..."
+              />
+            </div>
+
+            <button 
+              type="submit" 
+              disabled={savingBrand || uploading}
+              className="w-full py-5 bg-blue-600 text-white font-black rounded-2xl uppercase text-[10px] tracking-widest shadow-xl hover:bg-blue-500 transition-all disabled:opacity-50"
+            >
+              {savingBrand ? 'Salvando...' : 'Salvar Identidade'}
+            </button>
+          </form>
+        </div>
+      ) : (
+        /* Seção de Links */
+        <>
+          <button
+            onClick={() => {
+              setErrorMessage(null);
+              setEditingLink({ category: activeAdminTab, type: 'glass', icon: 'auto', title: '', description: 'Clique para jogar', url: '', badge: '' });
+            }}
+            className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-sm mb-12 shadow-2xl hover:scale-[1.01] transition-all active:scale-95"
+          >
+            + Novo Link em "{activeAdminTab}"
+          </button>
+
+          <div className="space-y-4">
+            <div className="flex justify-between items-center mb-6 px-2">
+              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em]">Plataformas na {activeAdminTab}</h3>
+              <span className="text-[9px] bg-white/10 px-3 py-1 rounded-full text-gray-400 font-bold">{filteredLinks.length} Links</span>
+            </div>
+            
+            {filteredLinks.length === 0 ? (
+              <div className="text-center py-20 border border-dashed border-white/5 rounded-[3rem] bg-white/[0.01]">
+                <p className="text-gray-600 uppercase text-[9px] font-black tracking-[0.5em]">Sem links cadastrados</p>
+              </div>
+            ) : (
+              filteredLinks.map((link, idx) => (
+                <div key={link.id} className="bg-[#0f0f0f] p-5 rounded-[2.5rem] flex items-center justify-between border border-white/5 hover:border-white/10 transition-colors">
+                  <div className="flex items-center gap-5">
+                    <div className="flex flex-col gap-1">
+                      <button onClick={() => handleMove(idx, 'up')} disabled={idx === 0} className={`p-1.5 rounded-lg border border-white/5 hover:bg-white/10 ${idx === 0 ? 'opacity-20 cursor-not-allowed' : 'text-yellow-500'}`}>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 15l7-7 7 7"/></svg>
+                      </button>
+                      <button onClick={() => handleMove(idx, 'down')} disabled={idx === filteredLinks.length - 1} className={`p-1.5 rounded-lg border border-white/5 hover:bg-white/10 ${idx === filteredLinks.length - 1 ? 'opacity-20 cursor-not-allowed' : 'text-yellow-500'}`}>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7"/></svg>
+                      </button>
+                    </div>
+
+                    <div className="w-14 h-14 bg-black rounded-2xl flex items-center justify-center border border-white/10 text-yellow-500">
+                      {Icons[link.icon || 'slots'] || Icons.slots}
+                    </div>
+                    <div>
+                      <h4 className="font-black text-sm uppercase text-white tracking-tight">{link.title}</h4>
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <span className="text-[9px] bg-blue-500 text-white px-3 py-1 rounded-lg shadow-[0_5px_15px_rgba(59,130,246,0.3)] uppercase font-black">
+                          🖱️ {link.click_count || 0} CLIQUES
+                        </span>
+                        <span className="text-[8px] bg-white/5 text-gray-500 px-2 py-1 rounded uppercase font-black border border-white/5">
+                          Estilo: {link.type}
+                        </span>
+                        {link.badge && <span className="text-[8px] text-yellow-500 font-black px-1">● {link.badge}</span>}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <button onClick={() => { setErrorMessage(null); setEditingLink(link); }} className="w-11 h-11 flex items-center justify-center bg-white/5 rounded-xl hover:bg-white/10 text-white border border-white/5">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.14-10.14a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.86 3.86z" /></svg>
+                    </button>
+                    <button onClick={() => handleDelete(link.id!)} className="w-11 h-11 flex items-center justify-center bg-red-600/10 text-red-500 rounded-xl hover:bg-red-600 hover:text-white border border-red-600/10">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
                   </div>
                 </div>
-              </div>
-              
-              <div className="flex gap-2">
-                <button onClick={() => { setErrorMessage(null); setEditingLink(link); }} className="w-11 h-11 flex items-center justify-center bg-white/5 rounded-xl hover:bg-white/10 text-white border border-white/5">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.14-10.14a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.86 3.86z" /></svg>
-                </button>
-                <button onClick={() => handleDelete(link.id!)} className="w-11 h-11 flex items-center justify-center bg-red-600/10 text-red-500 rounded-xl hover:bg-red-600 hover:text-white border border-red-600/10">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                </button>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
 
       {/* Editor Modal */}
       {editingLink && (
@@ -282,13 +430,7 @@ const AdminPanel: React.FC = () => {
             <div className="space-y-5">
               <div className="p-5 bg-yellow-500/5 border border-yellow-500/10 rounded-[1.8rem]">
                 <label className="text-[9px] uppercase font-black text-yellow-500 block mb-2 tracking-widest">Página Atual</label>
-                <input 
-                  className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white outline-none focus:border-yellow-500" 
-                  value={editingLink.category || ''} 
-                  onChange={e => setEditingLink({...editingLink, category: e.target.value})} 
-                  placeholder="Ex: Página 1" 
-                  required 
-                />
+                <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white outline-none focus:border-yellow-500" value={editingLink.category || ''} onChange={e => setEditingLink({...editingLink, category: e.target.value})} placeholder="Ex: Página 1" required />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -298,12 +440,7 @@ const AdminPanel: React.FC = () => {
                 </div>
                 <div className="space-y-2">
                   <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Estilo do Card</label>
-                  <select 
-                    className="w-full p-4 rounded-xl text-[10px] font-black bg-black border border-white/10 text-white outline-none uppercase appearance-none" 
-                    value={editingLink.type || 'glass'} 
-                    onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}
-                    style={{ backgroundColor: '#0a0a0a', color: 'white' }}
-                  >
+                  <select className="w-full p-4 rounded-xl text-[10px] font-black bg-black border border-white/10 text-white outline-none uppercase appearance-none" value={editingLink.type || 'glass'} onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}>
                     <option value="gold">Dourado</option>
                     <option value="neon-purple">Roxo</option>
                     <option value="neon-green">Verde</option>
@@ -314,12 +451,7 @@ const AdminPanel: React.FC = () => {
 
               <div className="space-y-2">
                 <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Descrição / Chamada</label>
-                <input 
-                  className="w-full p-4 rounded-xl text-sm bg-white/5 border border-white/10 text-white outline-none focus:border-yellow-500" 
-                  value={editingLink.description || ''} 
-                  onChange={e => setEditingLink({...editingLink, description: e.target.value})} 
-                  placeholder="Ex: Clique para ganhar 100% de bônus" 
-                />
+                <input className="w-full p-4 rounded-xl text-sm bg-white/5 border border-white/10 text-white outline-none focus:border-yellow-500" value={editingLink.description || ''} onChange={e => setEditingLink({...editingLink, description: e.target.value})} placeholder="Ex: Clique para ganhar 100% de bônus" />
               </div>
 
               <div className="space-y-2">
@@ -330,12 +462,7 @@ const AdminPanel: React.FC = () => {
               <div className="grid grid-cols-2 gap-5">
                 <div className="space-y-2">
                   <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Ícone</label>
-                  <select 
-                    className="w-full p-4 rounded-xl text-[10px] font-black bg-black border border-white/10 text-white outline-none uppercase appearance-none" 
-                    value={editingLink.icon || 'auto'} 
-                    onChange={e => setEditingLink({...editingLink, icon: e.target.value})}
-                    style={{ backgroundColor: '#0a0a0a', color: 'white' }}
-                  >
+                  <select className="w-full p-4 rounded-xl text-[10px] font-black bg-black border border-white/10 text-white outline-none uppercase appearance-none" value={editingLink.icon || 'auto'} onChange={e => setEditingLink({...editingLink, icon: e.target.value})}>
                     <option value="auto">🌐 Auto</option>
                     <option value="slots">🎰 Slots</option>
                     <option value="rocket">🚀 Crash</option>
