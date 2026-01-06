@@ -143,7 +143,6 @@ const App: React.FC = () => {
           />
         )}
         
-        {/* DINAMIC EFFECTS RENDERER */}
         {effect === 'scanner' && <div className="scanner-beam" />}
         
         {effect === 'gold-rain' && Array.from({ length: 40 }).map((_, i) => (
@@ -172,8 +171,38 @@ const App: React.FC = () => {
 
         {effect === 'aurora' && <><div className="aurora-layer" style={{ top: '10%' }} /><div className="aurora-layer" style={{ top: '30%', animationDelay: '-10s', opacity: 0.5 }} /></>}
         
-        {effect === 'cyber-grid' && <div className="cyber-grid" />}
-        {effect === 'nebula' && <div className="nebula-glow" />}
+        {effect === 'confetti' && Array.from({ length: 50 }).map((_, i) => (
+          <div 
+            key={i} 
+            className="confetti" 
+            style={{ 
+              left: `${Math.random() * 100}%`, 
+              backgroundColor: `hsl(${Math.random() * 360}, 70%, 60%)`,
+              animationDuration: `${3 + Math.random() * 4}s`,
+              animationDelay: `${Math.random() * 5}s`
+            }} 
+          />
+        ))}
+
+        {effect === 'snow' && Array.from({ length: 60 }).map((_, i) => (
+          <div 
+            key={i} 
+            className="snow-particle" 
+            style={{ 
+              left: `${Math.random() * 100}%`, 
+              width: `${2 + Math.random() * 4}px`,
+              height: `${2 + Math.random() * 4}px`,
+              animationDuration: `${5 + Math.random() * 10}s`,
+              animationDelay: `${Math.random() * 10}s`
+            }} 
+          />
+        ))}
+
+        {effect === 'lightning' && <div className="lightning-flash animate-lightning" />}
+
+        {effect === 'glitch' && Array.from({ length: 10 }).map((_, i) => (
+          <div key={i} className="glitch-line" style={{ animationDelay: `${Math.random() * 2}s`, opacity: Math.random() * 0.3 }} />
+        ))}
 
         <div className="fixed inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/90 -z-15 pointer-events-none" />
       </div>

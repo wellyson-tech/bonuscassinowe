@@ -4,6 +4,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="img-src 'self' https://icons.duckduckgo.com https://api.faviconkit.com https://*.supabase.co https://*.postimg.cc data:; upgrade-insecure-requests;">
     <title>Bônus CassinoWE</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
@@ -188,6 +189,62 @@
       @keyframes aurora-wave {
         from { transform: translateX(-20%) skewY(10deg); }
         to { transform: translateX(0%) skewY(-10deg); }
+      }
+
+      /* 8. SNOW */
+      .snow-particle {
+        position: absolute;
+        top: -10px;
+        background: white;
+        border-radius: 50%;
+        opacity: 0.6;
+        animation: snow-fall linear infinite;
+      }
+      @keyframes snow-fall {
+        to { transform: translateY(105vh) translateX(20px); }
+      }
+
+      /* 9. LIGHTNING */
+      .lightning-flash {
+        position: absolute;
+        inset: 0;
+        background: white;
+        opacity: 0;
+        z-index: 1;
+        pointer-events: none;
+      }
+      .animate-lightning {
+        animation: lightning-strike 5s infinite;
+      }
+      @keyframes lightning-strike {
+        0%, 94%, 96%, 100% { opacity: 0; }
+        95%, 97% { opacity: 0.15; }
+      }
+
+      /* 10. GLITCH */
+      .glitch-line {
+        position: absolute;
+        width: 100%;
+        height: 1px;
+        background: rgba(255, 255, 255, 0.1);
+        animation: glitch-move 2s infinite linear;
+      }
+      @keyframes glitch-move {
+        from { top: -10%; }
+        to { top: 110%; }
+      }
+
+      /* 11. CONFETTI */
+      .confetti {
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        opacity: 0.8;
+        animation: confetti-fall linear infinite;
+      }
+      @keyframes confetti-fall {
+        0% { transform: translateY(-20px) rotate(0deg); }
+        100% { transform: translateY(110vh) rotate(720deg); }
       }
 
       /* UTILS */

@@ -29,5 +29,5 @@ export interface CasinoBrand {
   backgroundUrl?: string;
   verified: boolean;
   footerText?: string;
-  effect?: 'scanner' | 'gold-rain' | 'cyber-grid' | 'nebula' | 'matrix' | 'fire' | 'money' | 'space' | 'aurora' | 'glitch' | 'none';
+  effect?: 'scanner' | 'gold-rain' | 'cyber-grid' | 'nebula' | 'matrix' | 'fire' | 'money' | 'space' | 'aurora' | 'glitch' | 'confetti' | 'snow' | 'lightning' | 'none';
 }

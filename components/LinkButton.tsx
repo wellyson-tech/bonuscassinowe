@@ -56,16 +56,29 @@ const LinkButton: React.FC<Props> = ({ link, isAdminView = false }) => {
         const cleanUrl = link.url.trim();
         const urlWithProtocol = cleanUrl.startsWith('http') ? cleanUrl : `https://${cleanUrl}`;
         const domain = new URL(urlWithProtocol).hostname;
-        // Utilizando a API do DuckDuckGo conforme solicitado pelo usuário
-        const faviconUrl = `https://icons.duckduckgo.com/ip3/${domain}.ico`;
+        
+        // Tentando FaviconKit (128px) como fonte primária por ser maior e melhor qualidade
+        const faviconUrl = `https://api.faviconkit.com/${domain}/128`;
+        const fallbackFaviconUrl = `https://icons.duckduckgo.com/ip3/${domain}.ico`;
         
         return (
           <div className={containerClasses}>
-            <img src={faviconUrl} alt={link.title} className="w-full h-full object-contain filter drop-shadow-md brightness-110" onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.style.display = 'none';
-              if (target.parentElement) target.parentElement.innerHTML = '<div class="w-8 h-8 opacity-40">' + (Icons.slots as any) + '</div>';
-            }} />
+            <img 
+              src={faviconUrl} 
+              alt={link.title} 
+              className="w-full h-full object-contain filter drop-shadow-md brightness-110" 
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                // Se o FaviconKit falhar, tenta o DuckDuckGo
+                if (target.src === faviconUrl) {
+                  target.src = fallbackFaviconUrl;
+                } else {
+                  // Se ambos falharem, mostra o ícone padrão
+                  target.style.display = 'none';
+                  if (target.parentElement) target.parentElement.innerHTML = '<div class="w-8 h-8 opacity-40">' + (Icons.slots as any) + '</div>';
+                }
+              }} 
+            />
           </div>
         );
       } catch (e) {

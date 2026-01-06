@@ -67,18 +67,23 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  // --- LÓGICA DE MOVIMENTAÇÃO DE LINKS ---
+  // --- LÓGICA DE MOVIMENTAÇÃO DE LINKS (ISOLADA POR CATEGORIA) ---
   const moveLink = async (id: string, direction: 'up' | 'down') => {
-    const currentIdx = links.findIndex(l => l.id === id);
+    // Filtramos apenas os links da página atual para reordenar localmente
+    const pageLinks = links
+      .filter(l => (l.category || 'Página 1') === activeAdminPage)
+      .sort((a, b) => a.position - b.position);
+
+    const currentIdx = pageLinks.findIndex(l => l.id === id);
     if (currentIdx === -1) return;
 
     const targetIdx = direction === 'up' ? currentIdx - 1 : currentIdx + 1;
-    if (targetIdx < 0 || targetIdx >= links.length) return;
+    if (targetIdx < 0 || targetIdx >= pageLinks.length) return;
 
-    const currentLink = links[currentIdx];
-    const targetLink = links[targetIdx];
+    const currentLink = pageLinks[currentIdx];
+    const targetLink = pageLinks[targetIdx];
 
-    // Swapping positions
+    // Trocamos as posições apenas entre esses dois links
     const { error } = await supabase.from('links').upsert([
       { id: currentLink.id, position: targetLink.position },
       { id: targetLink.id, position: currentLink.position }
@@ -87,7 +92,7 @@ const AdminPanel: React.FC = () => {
     if (!error) fetchLinks();
   };
 
-  // --- LÓGICA DE MOVIMENTAÇÃO DE PÁGINAS (CATEGORIAS) ---
+  // --- LÓGICA DE MOVIMENTAÇÃO DE PÁGINAS ---
   const moveCategory = async (category: string, direction: 'left' | 'right') => {
     const categoriesOrder = Array.from(new Set(links.map(l => l.category || 'Página 1')));
     const currentIdx = categoriesOrder.indexOf(category);
@@ -98,17 +103,9 @@ const AdminPanel: React.FC = () => {
 
     const targetCategory = categoriesOrder[targetIdx];
     
-    // Pegar todos os links das duas categorias envolvidas
     const currentCatLinks = links.filter(l => (l.category || 'Página 1') === category);
     const targetCatLinks = links.filter(l => (l.category || 'Página 1') === targetCategory);
 
-    // Calcular novo bloco de posições
-    // Simplificando: vamos apenas trocar as categorias dos links para trocar a ordem visual mantendo a estrutura
-    // Mas o jeito mais robusto é trocar as ordens de posição
-    const minPos = Math.min(...currentCatLinks.map(l => l.position), ...targetCatLinks.map(l => l.position));
-    
-    // Criar payload de atualização: links da cat atual ganham posições da target e vice-versa
-    // Por simplicidade na implementação BioLink, vamos apenas inverter as strings de categoria
     const updates = [
       ...currentCatLinks.map(l => ({ id: l.id, category: targetCategory })),
       ...targetCatLinks.map(l => ({ id: l.id, category: category }))
@@ -116,7 +113,7 @@ const AdminPanel: React.FC = () => {
 
     const { error } = await supabase.from('links').upsert(updates);
     if (!error) {
-      setActiveAdminPage(direction === 'left' ? targetCategory : category); // Manter foco na aba
+      setActiveAdminPage(direction === 'left' ? targetCategory : category); 
       fetchLinks();
     }
   };
@@ -188,6 +185,10 @@ const AdminPanel: React.FC = () => {
     if (!editingLink) return;
     setLoading(true);
     try {
+      // Garantir que a posição seja o fim da categoria específica
+      const pageLinks = links.filter(l => (l.category || 'Página 1') === (editingLink.category || activeAdminPage));
+      const maxPosInPage = pageLinks.length > 0 ? Math.max(...pageLinks.map(l => l.position)) : 0;
+      
       const payload = {
         title: editingLink.title || 'Novo Link',
         description: editingLink.description || 'SAQUE MÍNIMO COM BÔNUS',
@@ -196,8 +197,9 @@ const AdminPanel: React.FC = () => {
         icon: editingLink.icon || 'auto',
         badge: editingLink.badge || '',
         category: editingLink.category || activeAdminPage || 'Página 1',
-        position: editingLink.position ?? links.length
+        position: editingLink.position ?? (maxPosInPage + 1)
       };
+      
       if (editingLink.id) await supabase.from('links').update(payload).eq('id', editingLink.id);
       else await supabase.from('links').insert([payload]);
       setEditingLink(null);
@@ -214,23 +216,27 @@ const AdminPanel: React.FC = () => {
   };
 
   const uniqueCategories = useMemo(() => Array.from(new Set(links.map(l => l.category || 'Página 1'))), [links]);
-  const filteredLinks = useMemo(() => links.filter(l => (l.category || 'Página 1') === activeAdminPage), [links, activeAdminPage]);
+  
+  // Links filtrados e ordenados por posição para a aba ativa
+  const filteredLinks = useMemo(() => {
+    return links
+      .filter(l => (l.category || 'Página 1') === activeAdminPage)
+      .sort((a, b) => a.position - b.position);
+  }, [links, activeAdminPage]);
 
   return (
     <div className="w-full max-w-5xl mx-auto p-4 md:p-10 bg-[#050505] min-h-screen text-white pb-32 font-sans">
-      {/* Header */}
       <div className="flex justify-between items-center mb-10 border-b border-white/5 pb-8">
         <div>
           <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter">CENTRAL DE CONTROLE</h2>
           <div className="flex items-center gap-2 mt-2">
              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-             <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black">Sistema Online - v4.0 Pro</p>
+             <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black">Sistema Online - v5.5 Precision</p>
           </div>
         </div>
         <button onClick={() => { supabase.auth.signOut(); window.location.reload(); }} className="px-6 py-2 bg-white/5 text-red-500 border border-red-500/20 rounded-xl text-[9px] font-black uppercase hover:bg-red-600 hover:text-white transition-all">Sair</button>
       </div>
 
-      {/* Main Navigation */}
       <div className="grid grid-cols-3 gap-3 mb-12">
         {(['links', 'social', 'brand'] as const).map(menu => (
           <button 
@@ -245,13 +251,11 @@ const AdminPanel: React.FC = () => {
         ))}
       </div>
 
-      {/* VIEW: LINKS */}
       {activeMenu === 'links' && (
         <div className="animate-fade-in space-y-8">
-          {/* SELETOR DE PÁGINAS COM REORDENAÇÃO */}
           <div className="flex flex-wrap gap-2 p-3 bg-white/[0.02] border border-white/5 rounded-[2.2rem] items-center">
             {uniqueCategories.map((cat, idx) => (
-              <div key={cat} className="flex items-center bg-black/40 rounded-full border border-white/5 overflow-hidden">
+              <div key={cat} className="flex items-center bg-black/40 rounded-full border border-white/5 overflow-hidden shadow-lg transition-transform">
                 <button 
                   onClick={() => setActiveAdminPage(cat)} 
                   className={`px-6 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeAdminPage === cat ? 'bg-white text-black' : 'text-gray-500 hover:text-white'}`}
@@ -262,30 +266,28 @@ const AdminPanel: React.FC = () => {
                   <button 
                     disabled={idx === 0} 
                     onClick={() => moveCategory(cat, 'left')} 
-                    className="px-2 py-3 text-[10px] hover:text-yellow-500 disabled:opacity-20"
+                    className="px-3 py-3 text-xs hover:text-yellow-500 disabled:opacity-20 transition-colors"
                   >←</button>
                   <button 
                     disabled={idx === uniqueCategories.length - 1} 
                     onClick={() => moveCategory(cat, 'right')} 
-                    className="px-2 py-3 text-[10px] hover:text-yellow-500 disabled:opacity-20"
+                    className="px-3 py-3 text-xs hover:text-yellow-500 disabled:opacity-20 transition-colors"
                   >→</button>
                 </div>
               </div>
             ))}
-            <button onClick={() => { const n = prompt("Nome da página:"); if(n) setActiveAdminPage(n); }} className="px-4 py-3 text-yellow-500 text-[10px] font-black uppercase tracking-widest hover:bg-yellow-500/10 rounded-full">+ Nova Página</button>
+            <button onClick={() => { const n = prompt("Nome da nova página:"); if(n) setActiveAdminPage(n); }} className="px-4 py-3 text-yellow-500 text-[10px] font-black uppercase tracking-widest hover:bg-yellow-500/10 rounded-full">+ Nova Página</button>
           </div>
 
           <button onClick={() => setEditingLink({ category: activeAdminPage, description: 'SAQUE MÍNIMO COM BÔNUS', type: 'glass', icon: 'auto' })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">+ Adicionar Plataforma em "{activeAdminPage}"</button>
 
-          {/* LISTA DE LINKS COM REORDENAÇÃO ↑ ↓ */}
           <div className="space-y-4">
             {filteredLinks.map((link, idx) => (
               <div key={link.id} className="bg-[#0f0f0f] p-5 rounded-[2rem] flex items-center justify-between border border-white/5 group">
                 <div className="flex items-center gap-4">
-                  {/* Controles de Posição Individual */}
                   <div className="flex flex-col gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => moveLink(link.id!, 'up')} disabled={idx === 0} className="w-6 h-6 bg-white/5 rounded flex items-center justify-center text-[10px] hover:bg-yellow-500 hover:text-black disabled:opacity-10">▲</button>
-                    <button onClick={() => moveLink(link.id!, 'down')} disabled={idx === filteredLinks.length - 1} className="w-6 h-6 bg-white/5 rounded flex items-center justify-center text-[10px] hover:bg-yellow-500 hover:text-black disabled:opacity-10">▼</button>
+                    <button onClick={() => moveLink(link.id!, 'up')} disabled={idx === 0} className="w-6 h-6 bg-white/5 rounded flex items-center justify-center text-[10px] hover:bg-yellow-500 hover:text-black disabled:opacity-10 transition-colors">▲</button>
+                    <button onClick={() => moveLink(link.id!, 'down')} disabled={idx === filteredLinks.length - 1} className="w-6 h-6 bg-white/5 rounded flex items-center justify-center text-[10px] hover:bg-yellow-500 hover:text-black disabled:opacity-10 transition-colors">▼</button>
                   </div>
                   
                   <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center border border-white/10 text-yellow-500">
@@ -293,7 +295,7 @@ const AdminPanel: React.FC = () => {
                   </div>
                   <div>
                     <h4 className="font-bold text-sm uppercase">{link.title}</h4>
-                    <p className="text-[9px] text-gray-500 uppercase font-black">{link.click_count || 0} Cliques • Ordem: {link.position}</p>
+                    <p className="text-[9px] text-gray-500 uppercase font-black">{link.click_count || 0} Cliques • Pos: {link.position}</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -302,11 +304,13 @@ const AdminPanel: React.FC = () => {
                 </div>
               </div>
             ))}
+            {filteredLinks.length === 0 && (
+              <div className="text-center py-10 opacity-20 uppercase font-black text-xs tracking-widest italic">Página Vazia</div>
+            )}
           </div>
         </div>
       )}
 
-      {/* VIEW: SOCIAL */}
       {activeMenu === 'social' && (
         <div className="animate-fade-in space-y-8">
           <button onClick={() => setEditingSocial({ icon: 'instagram' })} className="w-full py-6 bg-blue-600 text-white font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">+ Nova Rede Social</button>
@@ -330,7 +334,6 @@ const AdminPanel: React.FC = () => {
         </div>
       )}
 
-      {/* VIEW: BRAND */}
       {activeMenu === 'brand' && (
         <div className="animate-fade-in max-w-2xl mx-auto">
           <form onSubmit={handleSaveBrand} className="bg-[#0f0f0f] p-10 rounded-[3rem] border border-white/5 space-y-8 shadow-2xl">
@@ -362,27 +365,31 @@ const AdminPanel: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[9px] uppercase font-black text-gray-500 ml-2">Galeria de Atmosferas (Efeitos)</label>
+                <label className="text-[9px] uppercase font-black text-gray-500 ml-2">Biblioteca de Atmosferas</label>
                 <select 
                   className="w-full p-4 rounded-2xl text-sm bg-black border border-white/10 text-white font-bold uppercase"
                   value={brand.effect || 'scanner'}
                   onChange={e => setBrand({...brand, effect: e.target.value as any})}
                 >
-                  <optgroup label="Simples & Elegantes">
+                  <optgroup label="✨ Simples & Elegantes">
+                    <option value="none">🚫 Vazio Absoluto (Minimalista)</option>
                     <option value="scanner">🔦 Scanner Master (Luz Passante)</option>
-                    <option value="none">🚫 Vazio Absoluto (Fundo Limpo)</option>
+                    <option value="glitch">📺 Glitch Soft (Ruído Digital)</option>
                   </optgroup>
-                  <optgroup label="Dinâmicos">
-                    <option value="gold-rain">✨ Chuva de Ouro (Riqueza)</option>
-                    <option value="cyber-grid">🌐 Cyber Grid (Hitech)</option>
-                    <option value="nebula">🌌 Nebula Glow (Aurora Neon)</option>
+                  <optgroup label="🚀 Dinâmicos & Hitech">
+                    <option value="cyber-grid">🌐 Cyber Grid (Grade Tron)</option>
+                    <option value="nebula">🌌 Nebula Glow (Aura Espacial)</option>
+                    <option value="matrix">💻 Matrix Rain (Chuva de Código)</option>
+                    <option value="space">🚀 Star Warp (Velocidade da Luz)</option>
                   </optgroup>
-                  <optgroup label="Fantásticos & Master">
-                    <option value="matrix">💻 Matrix Rain (Code Blue)</option>
-                    <option value="fire">🔥 Fire Storm (Brasas Reais)</option>
-                    <option value="money">💰 Money Storm (Chuva de Grana)</option>
-                    <option value="space">🚀 Space Warp (Viagem Estelar)</option>
-                    <option value="aurora">🌈 Aurora Dream (Luzes Nórdicas)</option>
+                  <optgroup label="🔥 Fantásticos & Atmosféricos">
+                    <option value="gold-rain">💰 Gold Rain (Chuva de Ouro)</option>
+                    <option value="fire">🔥 Ember Storm (Brasas Reais)</option>
+                    <option value="money">💵 Cash Fall (Chuva de Notas)</option>
+                    <option value="confetti">🎉 Confetti Party (Modo Festa)</option>
+                    <option value="snow">❄️ Snow Fall (Inverno Master)</option>
+                    <option value="lightning">⚡ Thunder Flash (Trovoadas)</option>
+                    <option value="aurora">🌈 Aurora Dream (Aurora Boreal)</option>
                   </optgroup>
                 </select>
               </div>
@@ -403,14 +410,13 @@ const AdminPanel: React.FC = () => {
               </div>
             </div>
 
-            <button type="submit" disabled={savingBrand} className="w-full py-6 bg-blue-600 text-white font-black rounded-2xl uppercase text-[11px] tracking-widest shadow-xl">
+            <button type="submit" disabled={savingBrand} className="w-full py-6 bg-blue-600 text-white font-black rounded-2xl uppercase text-[11px] tracking-widest shadow-xl hover:bg-blue-700 transition-colors">
               {savingBrand ? 'Salvando...' : 'Salvar Configurações Master'}
             </button>
           </form>
         </div>
       )}
 
-      {/* MODAL EDITORES */}
       {editingLink && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-[9999] overflow-y-auto">
           <form onSubmit={handleSaveLink} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-xl my-auto space-y-6">
@@ -438,7 +444,6 @@ const AdminPanel: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL EDITOR: SOCIAL */}
       {editingSocial && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-[9999]">
           <form onSubmit={handleSaveSocial} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-sm space-y-6">
