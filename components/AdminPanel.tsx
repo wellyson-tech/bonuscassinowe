@@ -68,9 +68,9 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  // --- LÓGICA DE MOVIMENTAÇÃO DE LINKS (TOTALMENTE ISOLADA) ---
+  // --- LÓGICA DE MOVIMENTAÇÃO DE LINKS (PRECISÃO POR PÁGINA) ---
   const moveLink = async (id: string, direction: 'up' | 'down') => {
-    // 1. Pegamos todos os links da página atual, ordenados pela posição atual
+    // Pegamos apenas os links da página que estamos vendo, ordenados corretamente
     const pageLinks = links
       .filter(l => (l.category || 'Página 1') === activeAdminPage)
       .sort((a, b) => a.position - b.position);
@@ -84,8 +84,7 @@ const AdminPanel: React.FC = () => {
     const currentLink = pageLinks[currentIdx];
     const targetLink = pageLinks[targetIdx];
 
-    // 2. Trocamos os valores de 'position' entre eles.
-    // Usamos as posições reais que eles já possuem no banco para garantir que fiquem no mesmo "bloco"
+    // Trocamos as posições entre os dois links no banco
     const { error } = await supabase.from('links').upsert([
       { id: currentLink.id, position: targetLink.position },
       { id: targetLink.id, position: currentLink.position }
@@ -108,7 +107,6 @@ const AdminPanel: React.FC = () => {
     const currentCatLinks = links.filter(l => (l.category || 'Página 1') === category);
     const targetCatLinks = links.filter(l => (l.category || 'Página 1') === targetCategory);
 
-    // Swap total das categorias nos links
     const updates = [
       ...currentCatLinks.map(l => ({ id: l.id, category: targetCategory })),
       ...targetCatLinks.map(l => ({ id: l.id, category: category }))
@@ -126,8 +124,16 @@ const AdminPanel: React.FC = () => {
     if (!editingLink) return;
     setLoading(true);
     try {
-      // Ao criar um novo link, ele deve ir para o final de TODAS as posições para não conflitar
-      const globalMaxPos = links.length > 0 ? Math.max(...links.map(l => l.position)) : 0;
+      const targetCategory = editingLink.category || activeAdminPage || 'Página 1';
+      
+      // Se for um novo link, calculamos a posição com base APENAS no máximo daquela categoria
+      let positionToSave = editingLink.position;
+      
+      if (!editingLink.id) {
+        const pageLinks = links.filter(l => (l.category || 'Página 1') === targetCategory);
+        const maxPosInPage = pageLinks.length > 0 ? Math.max(...pageLinks.map(l => l.position)) : 0;
+        positionToSave = maxPosInPage + 1;
+      }
       
       const payload = {
         title: editingLink.title || 'Novo Link',
@@ -136,17 +142,40 @@ const AdminPanel: React.FC = () => {
         type: editingLink.type || 'glass',
         icon: editingLink.icon || 'auto',
         badge: editingLink.badge || '',
-        category: editingLink.category || activeAdminPage || 'Página 1',
-        position: editingLink.position ?? (globalMaxPos + 1)
+        category: targetCategory,
+        position: positionToSave
       };
       
-      if (editingLink.id) await supabase.from('links').update(payload).eq('id', editingLink.id);
-      else await supabase.from('links').insert([payload]);
+      if (editingLink.id) {
+        await supabase.from('links').update(payload).eq('id', editingLink.id);
+      } else {
+        await supabase.from('links').insert([payload]);
+      }
       
       setEditingLink(null);
       fetchLinks();
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Função para limpar e organizar as posições de uma página (Reset Técnico)
+  const reorderCurrentPagePositions = async () => {
+    const pageLinks = links
+      .filter(l => (l.category || 'Página 1') === activeAdminPage)
+      .sort((a, b) => a.position - b.position);
+    
+    const updates = pageLinks.map((link, index) => ({
+      id: link.id,
+      position: index + 1
+    }));
+
+    if (updates.length > 0) {
+      setLoading(true);
+      await supabase.from('links').upsert(updates);
+      fetchLinks();
+      setLoading(false);
+      alert("Ordem da página organizada!");
     }
   };
 
@@ -158,14 +187,13 @@ const AdminPanel: React.FC = () => {
 
   const uniqueCategories = useMemo(() => Array.from(new Set(links.map(l => l.category || 'Página 1'))), [links]);
   
-  // Exibição filtrada: Garante que os links apareçam na ordem correta dentro da página
   const filteredLinks = useMemo(() => {
     return links
       .filter(l => (l.category || 'Página 1') === activeAdminPage)
       .sort((a, b) => a.position - b.position);
   }, [links, activeAdminPage]);
 
-  // Funções de Social e Brand (mantidas)
+  // Restante das funções (Social/Brand/Upload)
   const handleSaveSocial = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingSocial) return;
@@ -235,7 +263,7 @@ const AdminPanel: React.FC = () => {
           <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter">CENTRAL DE CONTROLE</h2>
           <div className="flex items-center gap-2 mt-2">
              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-             <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black">v6.0 - Estrutura de Páginas Isolada</p>
+             <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black">v6.5 - Ordem Independente por Página</p>
           </div>
         </div>
         <button onClick={() => { supabase.auth.signOut(); window.location.reload(); }} className="px-6 py-2 bg-white/5 text-red-500 border border-red-500/20 rounded-xl text-[9px] font-black uppercase hover:bg-red-600 hover:text-white transition-all">Sair</button>
@@ -283,7 +311,10 @@ const AdminPanel: React.FC = () => {
             <button onClick={() => { const n = prompt("Nome da nova página:"); if(n) setActiveAdminPage(n); }} className="px-4 py-3 text-yellow-500 text-[10px] font-black uppercase tracking-widest hover:bg-yellow-500/10 rounded-full">+ Nova Página</button>
           </div>
 
-          <button onClick={() => setEditingLink({ category: activeAdminPage, description: 'SAQUE MÍNIMO COM BÔNUS', type: 'glass', icon: 'auto' })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">+ Adicionar Plataforma em "{activeAdminPage}"</button>
+          <div className="flex gap-2">
+            <button onClick={() => setEditingLink({ category: activeAdminPage, description: 'SAQUE MÍNIMO COM BÔNUS', type: 'glass', icon: 'auto' })} className="flex-1 py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">+ Adicionar Plataforma em "{activeAdminPage}"</button>
+            <button onClick={reorderCurrentPagePositions} className="px-8 bg-white/5 text-white font-black rounded-[2.5rem] border border-white/10 hover:bg-white/10 transition-all text-[9px] uppercase" title="Organizar Posições (1, 2, 3...)">Organizar Ordens</button>
+          </div>
 
           <div className="space-y-4">
             {filteredLinks.map((link, idx) => (
@@ -315,6 +346,7 @@ const AdminPanel: React.FC = () => {
         </div>
       )}
 
+      {/* Social e Brand Views permanecem iguais */}
       {activeMenu === 'social' && (
         <div className="animate-fade-in space-y-8">
           <button onClick={() => setEditingSocial({ icon: 'instagram' })} className="w-full py-6 bg-blue-600 text-white font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">+ Nova Rede Social</button>
