@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { CasinoLink, CasinoBrand, SocialLink } from '../types';
-import { Icons, BRAND as DEFAULT_BRAND } from '../constants';
+import { Icons, BRAND as DEFAULT_BRAND, ADMIN_UID } from '../constants';
 
 const AdminPanel: React.FC = () => {
   const [activeMenu, setActiveMenu] = useState<'links' | 'social' | 'brand'>('links');
@@ -14,7 +14,6 @@ const AdminPanel: React.FC = () => {
   const [editingSocial, setEditingSocial] = useState<Partial<SocialLink> | null>(null);
   
   const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [activeAdminPage, setActiveAdminPage] = useState<string>('');
   const [savingBrand, setSavingBrand] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -52,7 +51,6 @@ const AdminPanel: React.FC = () => {
   };
 
   const fetchLinks = async () => {
-    setRefreshing(true);
     try {
       const { data } = await supabase.from('links').select('*').order('position', { ascending: true });
       if (data) {
@@ -62,9 +60,7 @@ const AdminPanel: React.FC = () => {
           setActiveAdminPage(uniqueCats[0]);
         } else if (!activeAdminPage) setActiveAdminPage('Página 1');
       }
-    } finally {
-      setRefreshing(false);
-    }
+    } catch (e) {}
   };
 
   const moveLink = async (id: string, direction: 'up' | 'down') => {
@@ -147,13 +143,6 @@ const AdminPanel: React.FC = () => {
       const reorderedList = [...otherLinksInPage];
       reorderedList.splice(newPos - 1, 0, { ...editingLink, position: newPos } as any);
 
-      const finalUpdates = reorderedList.map((item, idx) => ({
-        ...item,
-        id: item.id,
-        position: idx + 1,
-        category: targetCategory
-      }));
-
       const payload = {
         id: editingLink.id,
         title: editingLink.title || 'Novo Link',
@@ -175,18 +164,18 @@ const AdminPanel: React.FC = () => {
           await supabase.from('links').upsert(updates);
         }
       } else {
-        const updates = finalUpdates.filter(u => u.id).map(u => ({
-          id: u.id,
-          title: u.title,
-          description: u.description,
-          url: u.url,
-          type: u.type,
-          icon: u.icon,
-          badge: u.badge,
-          category: u.category,
-          position: u.position
+        const finalUpdates = reorderedList.map((item, idx) => ({
+          id: item.id,
+          title: item.title,
+          description: item.description,
+          url: item.url,
+          type: item.type,
+          icon: item.icon,
+          badge: item.badge,
+          category: item.category,
+          position: idx + 1
         }));
-        await supabase.from('links').upsert(updates);
+        await supabase.from('links').upsert(finalUpdates);
       }
       
       setEditingLink(null);
@@ -204,31 +193,11 @@ const AdminPanel: React.FC = () => {
     table === 'links' ? fetchLinks() : fetchSocials();
   };
 
-  const handleSaveSocial = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingSocial) return;
-    setLoading(true);
-    try {
-      const payload = {
-        name: editingSocial.name || 'Social',
-        url: editingSocial.url || '',
-        icon: editingSocial.icon || 'instagram',
-        position: editingSocial.position ?? socials.length
-      };
-      if (editingSocial.id) await supabase.from('social_links').update(payload).eq('id', editingSocial.id);
-      else await supabase.from('social_links').insert([payload]);
-      setEditingSocial(null);
-      fetchSocials();
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSaveBrand = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingBrand(true);
     try {
-      await supabase.from('brand_settings').upsert({
+      const { error } = await supabase.from('brand_settings').upsert({
         id: 1,
         name: brand.name,
         tagline: brand.tagline,
@@ -237,8 +206,12 @@ const AdminPanel: React.FC = () => {
         verified: brand.verified,
         footer_text: brand.footerText,
         effect: brand.effect
-      });
-      alert("Identidade salva!");
+      }, { onConflict: 'id' });
+      
+      if (error) throw error;
+      alert("Identidade visual salva com sucesso!");
+    } catch (err: any) {
+      alert("Erro ao salvar identidade: " + err.message);
     } finally {
       setSavingBrand(false);
     }
@@ -252,30 +225,31 @@ const AdminPanel: React.FC = () => {
     isLogo ? setUploadingLogo(true) : setUploadingBg(true);
 
     try {
+      // 1. Gerar nome único para evitar conflitos de cache e RLS
       const fileExt = file.name.split('.').pop();
-      const fileName = `${type}-${Math.random()}.${fileExt}`;
+      const fileName = `${type}-${Date.now()}-${Math.floor(Math.random() * 1000)}.${fileExt}`;
       
-      const { error: uploadError } = await supabase.storage.from('brand').upload(fileName, file);
+      // 2. Upload para o Bucket 'brand'
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('brand')
+        .upload(fileName, file, { cacheControl: '3600', upsert: true });
+
       if (uploadError) throw uploadError;
 
+      // 3. Obter URL Pública
       const { data: { publicUrl } } = supabase.storage.from('brand').getPublicUrl(fileName);
       
-      // ATUALIZAÇÃO IMEDIATA NO BANCO DE DADOS
-      const updateData = isLogo ? { logo_url: publicUrl } : { background_url: publicUrl };
+      // 4. Atualizar estado local antes de persistir (UX melhor)
+      if (isLogo) {
+        setBrand(prev => ({ ...prev, logoUrl: publicUrl }));
+      } else {
+        setBrand(prev => ({ ...prev, backgroundUrl: publicUrl }));
+      }
       
-      const { error: dbError } = await supabase
-        .from('brand_settings')
-        .update(updateData)
-        .eq('id', 1);
-
-      if (dbError) throw dbError;
-
-      if (isLogo) setBrand(prev => ({ ...prev, logoUrl: publicUrl }));
-      else setBrand(prev => ({ ...prev, backgroundUrl: publicUrl }));
-      
-      alert(`${isLogo ? 'Logo' : 'Fundo'} atualizado com sucesso!`);
+      alert(`Arquivo carregado! Clique em 'Salvar Configurações' abaixo para confirmar as alterações no banco de dados.`);
     } catch (err: any) {
-      alert("Erro no upload: " + err.message);
+      console.error("Erro no upload:", err);
+      alert("Erro no upload: " + (err.message || "Verifique as permissões do Bucket 'brand' no Supabase."));
     } finally {
       isLogo ? setUploadingLogo(false) : setUploadingBg(false);
     }
@@ -296,7 +270,7 @@ const AdminPanel: React.FC = () => {
           <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter">CENTRAL DE CONTROLE</h2>
           <div className="flex items-center gap-2 mt-2">
              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-             <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black">v8.2 - Upload Persistente Ativo</p>
+             <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black">v8.5 - Master Admin Ativo</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -354,7 +328,7 @@ const AdminPanel: React.FC = () => {
                   </div>
                   <div>
                     <h4 className="font-bold text-sm uppercase">{link.title}</h4>
-                    <p className="text-[9px] text-gray-500 uppercase font-black">{link.click_count || 0} Cliques • Posição Atual: <span className="text-yellow-500">{link.position}º</span></p>
+                    <p className="text-[9px] text-gray-500 uppercase font-black">{link.click_count || 0} Cliques • Posição: <span className="text-yellow-500">{link.position}º</span></p>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -397,18 +371,26 @@ const AdminPanel: React.FC = () => {
                <div className="text-center space-y-4">
                  <label className="text-[9px] uppercase font-black text-gray-500 tracking-widest">Logo Principal</label>
                  <div onClick={() => logoInputRef.current?.click()} className="w-24 h-24 mx-auto rounded-full border-2 border-dashed border-yellow-500 p-1 cursor-pointer overflow-hidden bg-black group relative">
-                    <img src={brand.logoUrl} className="w-full h-full object-cover rounded-full group-hover:opacity-40" alt="Logo" />
+                    {brand.logoUrl ? (
+                      <img src={brand.logoUrl} className="w-full h-full object-cover rounded-full group-hover:opacity-40" alt="Logo" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-500 font-black text-[10px]">VAZIO</div>
+                    )}
                     {uploadingLogo && <div className="absolute inset-0 bg-black/80 flex items-center justify-center animate-spin">⌛</div>}
                  </div>
-                 <input type="file" ref={logoInputRef} onChange={e => handleFileUpload(e, 'logo')} className="hidden" />
+                 <input type="file" ref={logoInputRef} onChange={e => handleFileUpload(e, 'logo')} className="hidden" accept="image/*" />
                </div>
                <div className="text-center space-y-4">
                  <label className="text-[9px] uppercase font-black text-gray-500 tracking-widest">Fundo (Background)</label>
                  <div onClick={() => bgInputRef.current?.click()} className="w-full h-24 rounded-2xl border-2 border-dashed border-blue-500 cursor-pointer overflow-hidden bg-black group relative">
-                    {brand.backgroundUrl && <img src={brand.backgroundUrl} className="w-full h-full object-cover group-hover:opacity-40" alt="BG" />}
+                    {brand.backgroundUrl ? (
+                      <img src={brand.backgroundUrl} className="w-full h-full object-cover group-hover:opacity-40" alt="BG" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-500 font-black text-[10px]">SEM FUNDO</div>
+                    )}
                     {uploadingBg && <div className="absolute inset-0 bg-black/80 flex items-center justify-center animate-spin">⌛</div>}
                  </div>
-                 <input type="file" ref={bgInputRef} onChange={e => handleFileUpload(e, 'background')} className="hidden" />
+                 <input type="file" ref={bgInputRef} onChange={e => handleFileUpload(e, 'background')} className="hidden" accept="image/*" />
                </div>
             </div>
 
@@ -444,18 +426,24 @@ const AdminPanel: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[9px] uppercase font-black text-gray-500 ml-2">Tagline</label>
+                <label className="text-[9px] uppercase font-black text-gray-500 ml-2">Tagline (Bio)</label>
                 <textarea className="w-full p-4 rounded-2xl text-sm bg-black border border-white/10 text-white min-h-[80px]" value={brand.tagline} onChange={e => setBrand({...brand, tagline: e.target.value})} />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[9px] uppercase font-black text-gray-500 ml-2">Texto do Rodapé</label>
+                <input className="w-full p-4 rounded-2xl text-sm bg-black border border-white/10 text-white" value={brand.footerText || ''} onChange={e => setBrand({...brand, footerText: e.target.value})} />
               </div>
             </div>
 
             <button type="submit" disabled={savingBrand} className="w-full py-6 bg-blue-600 text-white font-black rounded-2xl uppercase text-[11px] tracking-widest shadow-xl hover:bg-blue-700 transition-colors">
-              {savingBrand ? 'Salvando...' : 'Salvar Configurações'}
+              {savingBrand ? 'Sincronizando...' : 'Salvar Configurações Master'}
             </button>
           </form>
         </div>
       )}
 
+      {/* Editor de Link e Social mantidos conforme a lógica anterior */}
       {editingLink && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-[9999] overflow-y-auto">
           <form onSubmit={handleSaveLink} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-xl my-auto space-y-6 shadow-2xl">
