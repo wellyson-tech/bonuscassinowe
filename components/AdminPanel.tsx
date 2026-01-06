@@ -54,6 +54,7 @@ const AdminPanel: React.FC = () => {
   const fetchLinks = async () => {
     setRefreshing(true);
     try {
+      // Buscamos tudo ordenado por posição
       const { data } = await supabase.from('links').select('*').order('position', { ascending: true });
       if (data) {
         setLinks(data);
@@ -67,9 +68,9 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  // --- LÓGICA DE MOVIMENTAÇÃO DE LINKS (ISOLADA POR CATEGORIA) ---
+  // --- LÓGICA DE MOVIMENTAÇÃO DE LINKS (TOTALMENTE ISOLADA) ---
   const moveLink = async (id: string, direction: 'up' | 'down') => {
-    // Filtramos apenas os links da página atual para reordenar localmente
+    // 1. Pegamos todos os links da página atual, ordenados pela posição atual
     const pageLinks = links
       .filter(l => (l.category || 'Página 1') === activeAdminPage)
       .sort((a, b) => a.position - b.position);
@@ -83,7 +84,8 @@ const AdminPanel: React.FC = () => {
     const currentLink = pageLinks[currentIdx];
     const targetLink = pageLinks[targetIdx];
 
-    // Trocamos as posições apenas entre esses dois links
+    // 2. Trocamos os valores de 'position' entre eles.
+    // Usamos as posições reais que eles já possuem no banco para garantir que fiquem no mesmo "bloco"
     const { error } = await supabase.from('links').upsert([
       { id: currentLink.id, position: targetLink.position },
       { id: targetLink.id, position: currentLink.position }
@@ -106,6 +108,7 @@ const AdminPanel: React.FC = () => {
     const currentCatLinks = links.filter(l => (l.category || 'Página 1') === category);
     const targetCatLinks = links.filter(l => (l.category || 'Página 1') === targetCategory);
 
+    // Swap total das categorias nos links
     const updates = [
       ...currentCatLinks.map(l => ({ id: l.id, category: targetCategory })),
       ...targetCatLinks.map(l => ({ id: l.id, category: category }))
@@ -118,24 +121,68 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'background') => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    type === 'logo' ? setUploadingLogo(true) : setUploadingBg(true);
+  const handleSaveLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingLink) return;
+    setLoading(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${type}-${Math.random()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage.from('brand').upload(fileName, file);
-      if (uploadError) throw uploadError;
-      const { data: { publicUrl } } = supabase.storage.from('brand').getPublicUrl(fileName);
-      if (type === 'logo') setBrand(prev => ({ ...prev, logoUrl: publicUrl }));
-      else setBrand(prev => ({ ...prev, backgroundUrl: publicUrl }));
-      alert("Imagem carregada!");
-    } catch (err: any) {
-      alert("Erro no upload: " + err.message);
+      // Ao criar um novo link, ele deve ir para o final de TODAS as posições para não conflitar
+      const globalMaxPos = links.length > 0 ? Math.max(...links.map(l => l.position)) : 0;
+      
+      const payload = {
+        title: editingLink.title || 'Novo Link',
+        description: editingLink.description || 'SAQUE MÍNIMO COM BÔNUS',
+        url: editingLink.url || '',
+        type: editingLink.type || 'glass',
+        icon: editingLink.icon || 'auto',
+        badge: editingLink.badge || '',
+        category: editingLink.category || activeAdminPage || 'Página 1',
+        position: editingLink.position ?? (globalMaxPos + 1)
+      };
+      
+      if (editingLink.id) await supabase.from('links').update(payload).eq('id', editingLink.id);
+      else await supabase.from('links').insert([payload]);
+      
+      setEditingLink(null);
+      fetchLinks();
     } finally {
-      setUploadingLogo(false);
-      setUploadingBg(false);
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (table: string, id: string) => {
+    if (!confirm('Excluir este item?')) return;
+    await supabase.from(table).delete().eq('id', id);
+    table === 'links' ? fetchLinks() : fetchSocials();
+  };
+
+  const uniqueCategories = useMemo(() => Array.from(new Set(links.map(l => l.category || 'Página 1'))), [links]);
+  
+  // Exibição filtrada: Garante que os links apareçam na ordem correta dentro da página
+  const filteredLinks = useMemo(() => {
+    return links
+      .filter(l => (l.category || 'Página 1') === activeAdminPage)
+      .sort((a, b) => a.position - b.position);
+  }, [links, activeAdminPage]);
+
+  // Funções de Social e Brand (mantidas)
+  const handleSaveSocial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSocial) return;
+    setLoading(true);
+    try {
+      const payload = {
+        name: editingSocial.name || 'Social',
+        url: editingSocial.url || '',
+        icon: editingSocial.icon || 'instagram',
+        position: editingSocial.position ?? socials.length
+      };
+      if (editingSocial.id) await supabase.from('social_links').update(payload).eq('id', editingSocial.id);
+      else await supabase.from('social_links').insert([payload]);
+      setEditingSocial(null);
+      fetchSocials();
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -160,69 +207,26 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  const handleSaveSocial = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingSocial) return;
-    setLoading(true);
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'background') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    type === 'logo' ? setUploadingLogo(true) : setUploadingBg(true);
     try {
-      const payload = {
-        name: editingSocial.name || 'Social',
-        url: editingSocial.url || '',
-        icon: editingSocial.icon || 'instagram',
-        position: editingSocial.position ?? socials.length
-      };
-      if (editingSocial.id) await supabase.from('social_links').update(payload).eq('id', editingSocial.id);
-      else await supabase.from('social_links').insert([payload]);
-      setEditingSocial(null);
-      fetchSocials();
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${type}-${Math.random()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from('brand').upload(fileName, file);
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage.from('brand').getPublicUrl(fileName);
+      if (type === 'logo') setBrand(prev => ({ ...prev, logoUrl: publicUrl }));
+      else setBrand(prev => ({ ...prev, backgroundUrl: publicUrl }));
+      alert("Imagem carregada!");
+    } catch (err: any) {
+      alert("Erro no upload: " + err.message);
     } finally {
-      setLoading(false);
+      setUploadingLogo(false);
+      setUploadingBg(false);
     }
   };
-
-  const handleSaveLink = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingLink) return;
-    setLoading(true);
-    try {
-      // Garantir que a posição seja o fim da categoria específica
-      const pageLinks = links.filter(l => (l.category || 'Página 1') === (editingLink.category || activeAdminPage));
-      const maxPosInPage = pageLinks.length > 0 ? Math.max(...pageLinks.map(l => l.position)) : 0;
-      
-      const payload = {
-        title: editingLink.title || 'Novo Link',
-        description: editingLink.description || 'SAQUE MÍNIMO COM BÔNUS',
-        url: editingLink.url || '',
-        type: editingLink.type || 'glass',
-        icon: editingLink.icon || 'auto',
-        badge: editingLink.badge || '',
-        category: editingLink.category || activeAdminPage || 'Página 1',
-        position: editingLink.position ?? (maxPosInPage + 1)
-      };
-      
-      if (editingLink.id) await supabase.from('links').update(payload).eq('id', editingLink.id);
-      else await supabase.from('links').insert([payload]);
-      setEditingLink(null);
-      fetchLinks();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDelete = async (table: string, id: string) => {
-    if (!confirm('Excluir este item?')) return;
-    await supabase.from(table).delete().eq('id', id);
-    table === 'links' ? fetchLinks() : fetchSocials();
-  };
-
-  const uniqueCategories = useMemo(() => Array.from(new Set(links.map(l => l.category || 'Página 1'))), [links]);
-  
-  // Links filtrados e ordenados por posição para a aba ativa
-  const filteredLinks = useMemo(() => {
-    return links
-      .filter(l => (l.category || 'Página 1') === activeAdminPage)
-      .sort((a, b) => a.position - b.position);
-  }, [links, activeAdminPage]);
 
   return (
     <div className="w-full max-w-5xl mx-auto p-4 md:p-10 bg-[#050505] min-h-screen text-white pb-32 font-sans">
@@ -231,7 +235,7 @@ const AdminPanel: React.FC = () => {
           <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter">CENTRAL DE CONTROLE</h2>
           <div className="flex items-center gap-2 mt-2">
              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-             <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black">Sistema Online - v5.5 Precision</p>
+             <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black">v6.0 - Estrutura de Páginas Isolada</p>
           </div>
         </div>
         <button onClick={() => { supabase.auth.signOut(); window.location.reload(); }} className="px-6 py-2 bg-white/5 text-red-500 border border-red-500/20 rounded-xl text-[9px] font-black uppercase hover:bg-red-600 hover:text-white transition-all">Sair</button>
@@ -255,7 +259,7 @@ const AdminPanel: React.FC = () => {
         <div className="animate-fade-in space-y-8">
           <div className="flex flex-wrap gap-2 p-3 bg-white/[0.02] border border-white/5 rounded-[2.2rem] items-center">
             {uniqueCategories.map((cat, idx) => (
-              <div key={cat} className="flex items-center bg-black/40 rounded-full border border-white/5 overflow-hidden shadow-lg transition-transform">
+              <div key={cat} className="flex items-center bg-black/40 rounded-full border border-white/5 overflow-hidden shadow-lg">
                 <button 
                   onClick={() => setActiveAdminPage(cat)} 
                   className={`px-6 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeAdminPage === cat ? 'bg-white text-black' : 'text-gray-500 hover:text-white'}`}
@@ -286,8 +290,8 @@ const AdminPanel: React.FC = () => {
               <div key={link.id} className="bg-[#0f0f0f] p-5 rounded-[2rem] flex items-center justify-between border border-white/5 group">
                 <div className="flex items-center gap-4">
                   <div className="flex flex-col gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => moveLink(link.id!, 'up')} disabled={idx === 0} className="w-6 h-6 bg-white/5 rounded flex items-center justify-center text-[10px] hover:bg-yellow-500 hover:text-black disabled:opacity-10 transition-colors">▲</button>
-                    <button onClick={() => moveLink(link.id!, 'down')} disabled={idx === filteredLinks.length - 1} className="w-6 h-6 bg-white/5 rounded flex items-center justify-center text-[10px] hover:bg-yellow-500 hover:text-black disabled:opacity-10 transition-colors">▼</button>
+                    <button onClick={() => moveLink(link.id!, 'up')} disabled={idx === 0} className="w-6 h-6 bg-white/5 rounded flex items-center justify-center text-[10px] hover:bg-yellow-500 hover:text-black disabled:opacity-10">▲</button>
+                    <button onClick={() => moveLink(link.id!, 'down')} disabled={idx === filteredLinks.length - 1} className="w-6 h-6 bg-white/5 rounded flex items-center justify-center text-[10px] hover:bg-yellow-500 hover:text-black disabled:opacity-10">▼</button>
                   </div>
                   
                   <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center border border-white/10 text-yellow-500">
@@ -295,7 +299,7 @@ const AdminPanel: React.FC = () => {
                   </div>
                   <div>
                     <h4 className="font-bold text-sm uppercase">{link.title}</h4>
-                    <p className="text-[9px] text-gray-500 uppercase font-black">{link.click_count || 0} Cliques • Pos: {link.position}</p>
+                    <p className="text-[9px] text-gray-500 uppercase font-black">{link.click_count || 0} Cliques • Posição: {link.position}</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -417,15 +421,19 @@ const AdminPanel: React.FC = () => {
         </div>
       )}
 
+      {/* EDITOR DE LINKS */}
       {editingLink && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-[9999] overflow-y-auto">
           <form onSubmit={handleSaveLink} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-xl my-auto space-y-6">
             <h3 className="text-xl font-black uppercase text-shimmer">Configurar Plataforma</h3>
             <div className="space-y-4">
-              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.category || ''} onChange={e => setEditingLink({...editingLink, category: e.target.value})} placeholder="Página (Ex: Página 1)" />
+              <div className="space-y-1">
+                 <label className="text-[8px] font-black uppercase text-gray-500 ml-2">Mover para Página:</label>
+                 <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.category || ''} onChange={e => setEditingLink({...editingLink, category: e.target.value})} placeholder="Nome da Página (Ex: Página 1)" />
+              </div>
               <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.title || ''} onChange={e => setEditingLink({...editingLink, title: e.target.value})} placeholder="Nome da Plataforma" required />
-              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.description || ''} onChange={e => setEditingLink({...editingLink, description: e.target.value})} placeholder="Descrição" />
-              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.url || ''} onChange={e => setEditingLink({...editingLink, url: e.target.value})} placeholder="URL de Afiliado" required />
+              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.description || ''} onChange={e => setEditingLink({...editingLink, description: e.target.value})} placeholder="Descrição curta" />
+              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.url || ''} onChange={e => setEditingLink({...editingLink, url: e.target.value})} placeholder="URL (Link de Afiliado)" required />
               <div className="grid grid-cols-2 gap-4">
                 <select className="p-4 bg-black border border-white/10 rounded-xl text-[10px] uppercase font-black" value={editingLink.type} onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}>
                   <option value="gold">Dourado</option><option value="neon-purple">Roxo</option><option value="neon-green">Verde</option><option value="glass">Vidro</option>
@@ -434,7 +442,7 @@ const AdminPanel: React.FC = () => {
                   <option value="auto">🌐 Automático</option><option value="slots">🎰 Slots</option><option value="rocket">🚀 Crash</option><option value="fire">🔥 Fogo</option>
                 </select>
               </div>
-              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.badge || ''} onChange={e => setEditingLink({...editingLink, badge: e.target.value})} placeholder="Etiqueta (Ex: BÔNUS 100%)" />
+              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.badge || ''} onChange={e => setEditingLink({...editingLink, badge: e.target.value})} placeholder="Etiqueta (Ex: PAGANDO MUITO)" />
             </div>
             <div className="flex gap-3">
               <button type="button" onClick={() => setEditingLink(null)} className="flex-1 py-4 bg-white/5 rounded-xl uppercase font-black text-[10px]">Cancelar</button>
@@ -444,6 +452,7 @@ const AdminPanel: React.FC = () => {
         </div>
       )}
 
+      {/* EDITOR DE SOCIAL */}
       {editingSocial && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-[9999]">
           <form onSubmit={handleSaveSocial} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-sm space-y-6">
