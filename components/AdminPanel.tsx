@@ -54,7 +54,6 @@ const AdminPanel: React.FC = () => {
   const fetchLinks = async () => {
     setRefreshing(true);
     try {
-      // Buscamos tudo ordenado por posição
       const { data } = await supabase.from('links').select('*').order('position', { ascending: true });
       if (data) {
         setLinks(data);
@@ -68,9 +67,8 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  // --- LÓGICA DE MOVIMENTAÇÃO DE LINKS (PRECISÃO POR PÁGINA) ---
+  // --- LÓGICA DE MOVIMENTAÇÃO DE LINKS (PRECISÃO TOTAL) ---
   const moveLink = async (id: string, direction: 'up' | 'down') => {
-    // Pegamos apenas os links da página que estamos vendo, ordenados corretamente
     const pageLinks = links
       .filter(l => (l.category || 'Página 1') === activeAdminPage)
       .sort((a, b) => a.position - b.position);
@@ -84,7 +82,7 @@ const AdminPanel: React.FC = () => {
     const currentLink = pageLinks[currentIdx];
     const targetLink = pageLinks[targetIdx];
 
-    // Trocamos as posições entre os dois links no banco
+    // Troca as posições no banco
     const { error } = await supabase.from('links').upsert([
       { id: currentLink.id, position: targetLink.position },
       { id: targetLink.id, position: currentLink.position }
@@ -119,6 +117,38 @@ const AdminPanel: React.FC = () => {
     }
   };
 
+  // --- FUNÇÃO DE LIMPEZA PROFUNDA (RESET DE POSIÇÕES) ---
+  const deepReorder = async () => {
+    if (!confirm("Isso vai resetar as posições de TODOS os links para 1, 2, 3... dentro de cada página. Continuar?")) return;
+    
+    setLoading(true);
+    const uniqueCats = Array.from(new Set(links.map(l => l.category || 'Página 1')));
+    let allUpdates: any[] = [];
+
+    uniqueCats.forEach(cat => {
+      const catLinks = links
+        .filter(l => (l.category || 'Página 1') === cat)
+        .sort((a, b) => a.position - b.position);
+      
+      catLinks.forEach((link, index) => {
+        allUpdates.push({
+          id: link.id,
+          position: index + 1
+        });
+      });
+    });
+
+    if (allUpdates.length > 0) {
+      const { error } = await supabase.from('links').upsert(allUpdates);
+      if (error) alert("Erro ao organizar: " + error.message);
+      else {
+        fetchLinks();
+        alert("Posições normalizadas com sucesso!");
+      }
+    }
+    setLoading(false);
+  };
+
   const handleSaveLink = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingLink) return;
@@ -126,7 +156,6 @@ const AdminPanel: React.FC = () => {
     try {
       const targetCategory = editingLink.category || activeAdminPage || 'Página 1';
       
-      // Se for um novo link, calculamos a posição com base APENAS no máximo daquela categoria
       let positionToSave = editingLink.position;
       
       if (!editingLink.id) {
@@ -146,36 +175,17 @@ const AdminPanel: React.FC = () => {
         position: positionToSave
       };
       
-      if (editingLink.id) {
-        await supabase.from('links').update(payload).eq('id', editingLink.id);
-      } else {
-        await supabase.from('links').insert([payload]);
-      }
+      const { error } = editingLink.id 
+        ? await supabase.from('links').update(payload).eq('id', editingLink.id)
+        : await supabase.from('links').insert([payload]);
       
+      if (error) throw error;
       setEditingLink(null);
       fetchLinks();
+    } catch (err: any) {
+      alert("Erro ao salvar: " + err.message);
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Função para limpar e organizar as posições de uma página (Reset Técnico)
-  const reorderCurrentPagePositions = async () => {
-    const pageLinks = links
-      .filter(l => (l.category || 'Página 1') === activeAdminPage)
-      .sort((a, b) => a.position - b.position);
-    
-    const updates = pageLinks.map((link, index) => ({
-      id: link.id,
-      position: index + 1
-    }));
-
-    if (updates.length > 0) {
-      setLoading(true);
-      await supabase.from('links').upsert(updates);
-      fetchLinks();
-      setLoading(false);
-      alert("Ordem da página organizada!");
     }
   };
 
@@ -185,15 +195,6 @@ const AdminPanel: React.FC = () => {
     table === 'links' ? fetchLinks() : fetchSocials();
   };
 
-  const uniqueCategories = useMemo(() => Array.from(new Set(links.map(l => l.category || 'Página 1'))), [links]);
-  
-  const filteredLinks = useMemo(() => {
-    return links
-      .filter(l => (l.category || 'Página 1') === activeAdminPage)
-      .sort((a, b) => a.position - b.position);
-  }, [links, activeAdminPage]);
-
-  // Restante das funções (Social/Brand/Upload)
   const handleSaveSocial = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingSocial) return;
@@ -256,6 +257,14 @@ const AdminPanel: React.FC = () => {
     }
   };
 
+  const uniqueCategories = useMemo(() => Array.from(new Set(links.map(l => l.category || 'Página 1'))), [links]);
+  
+  const filteredLinks = useMemo(() => {
+    return links
+      .filter(l => (l.category || 'Página 1') === activeAdminPage)
+      .sort((a, b) => a.position - b.position);
+  }, [links, activeAdminPage]);
+
   return (
     <div className="w-full max-w-5xl mx-auto p-4 md:p-10 bg-[#050505] min-h-screen text-white pb-32 font-sans">
       <div className="flex justify-between items-center mb-10 border-b border-white/5 pb-8">
@@ -263,10 +272,13 @@ const AdminPanel: React.FC = () => {
           <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter">CENTRAL DE CONTROLE</h2>
           <div className="flex items-center gap-2 mt-2">
              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-             <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black">v6.5 - Ordem Independente por Página</p>
+             <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black">v7.0 - Limpeza de Posições Ativa</p>
           </div>
         </div>
-        <button onClick={() => { supabase.auth.signOut(); window.location.reload(); }} className="px-6 py-2 bg-white/5 text-red-500 border border-red-500/20 rounded-xl text-[9px] font-black uppercase hover:bg-red-600 hover:text-white transition-all">Sair</button>
+        <div className="flex gap-2">
+           <button onClick={deepReorder} className="px-4 py-2 bg-white/5 border border-white/10 text-yellow-500 rounded-xl text-[9px] font-black uppercase hover:bg-yellow-500 hover:text-black transition-all">Limpar Posições</button>
+           <button onClick={() => { supabase.auth.signOut(); window.location.reload(); }} className="px-6 py-2 bg-white/5 text-red-500 border border-red-500/20 rounded-xl text-[9px] font-black uppercase hover:bg-red-600 hover:text-white transition-all">Sair</button>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-3 mb-12">
@@ -311,10 +323,7 @@ const AdminPanel: React.FC = () => {
             <button onClick={() => { const n = prompt("Nome da nova página:"); if(n) setActiveAdminPage(n); }} className="px-4 py-3 text-yellow-500 text-[10px] font-black uppercase tracking-widest hover:bg-yellow-500/10 rounded-full">+ Nova Página</button>
           </div>
 
-          <div className="flex gap-2">
-            <button onClick={() => setEditingLink({ category: activeAdminPage, description: 'SAQUE MÍNIMO COM BÔNUS', type: 'glass', icon: 'auto' })} className="flex-1 py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">+ Adicionar Plataforma em "{activeAdminPage}"</button>
-            <button onClick={reorderCurrentPagePositions} className="px-8 bg-white/5 text-white font-black rounded-[2.5rem] border border-white/10 hover:bg-white/10 transition-all text-[9px] uppercase" title="Organizar Posições (1, 2, 3...)">Organizar Ordens</button>
-          </div>
+          <button onClick={() => setEditingLink({ category: activeAdminPage, description: 'SAQUE MÍNIMO COM BÔNUS', type: 'glass', icon: 'auto' })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">+ Adicionar em "{activeAdminPage}"</button>
 
           <div className="space-y-4">
             {filteredLinks.map((link, idx) => (
@@ -330,7 +339,7 @@ const AdminPanel: React.FC = () => {
                   </div>
                   <div>
                     <h4 className="font-bold text-sm uppercase">{link.title}</h4>
-                    <p className="text-[9px] text-gray-500 uppercase font-black">{link.click_count || 0} Cliques • Posição: {link.position}</p>
+                    <p className="text-[9px] text-gray-500 uppercase font-black">{link.click_count || 0} Cliques • Ordem: {idx + 1} <span className="text-[7px] opacity-30">(DB Pos: {link.position})</span></p>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -346,7 +355,6 @@ const AdminPanel: React.FC = () => {
         </div>
       )}
 
-      {/* Social e Brand Views permanecem iguais */}
       {activeMenu === 'social' && (
         <div className="animate-fade-in space-y-8">
           <button onClick={() => setEditingSocial({ icon: 'instagram' })} className="w-full py-6 bg-blue-600 text-white font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">+ Nova Rede Social</button>
@@ -402,31 +410,19 @@ const AdminPanel: React.FC = () => {
 
               <div className="space-y-2">
                 <label className="text-[9px] uppercase font-black text-gray-500 ml-2">Biblioteca de Atmosferas</label>
-                <select 
-                  className="w-full p-4 rounded-2xl text-sm bg-black border border-white/10 text-white font-bold uppercase"
-                  value={brand.effect || 'scanner'}
-                  onChange={e => setBrand({...brand, effect: e.target.value as any})}
-                >
-                  <optgroup label="✨ Simples & Elegantes">
-                    <option value="none">🚫 Vazio Absoluto (Minimalista)</option>
-                    <option value="scanner">🔦 Scanner Master (Luz Passante)</option>
-                    <option value="glitch">📺 Glitch Soft (Ruído Digital)</option>
-                  </optgroup>
-                  <optgroup label="🚀 Dinâmicos & Hitech">
-                    <option value="cyber-grid">🌐 Cyber Grid (Grade Tron)</option>
-                    <option value="nebula">🌌 Nebula Glow (Aura Espacial)</option>
-                    <option value="matrix">💻 Matrix Rain (Chuva de Código)</option>
-                    <option value="space">🚀 Star Warp (Velocidade da Luz)</option>
-                  </optgroup>
-                  <optgroup label="🔥 Fantásticos & Atmosféricos">
-                    <option value="gold-rain">💰 Gold Rain (Chuva de Ouro)</option>
-                    <option value="fire">🔥 Ember Storm (Brasas Reais)</option>
-                    <option value="money">💵 Cash Fall (Chuva de Notas)</option>
-                    <option value="confetti">🎉 Confetti Party (Modo Festa)</option>
-                    <option value="snow">❄️ Snow Fall (Inverno Master)</option>
-                    <option value="lightning">⚡ Thunder Flash (Trovoadas)</option>
-                    <option value="aurora">🌈 Aurora Dream (Aurora Boreal)</option>
-                  </optgroup>
+                <select className="w-full p-4 rounded-2xl text-sm bg-black border border-white/10 text-white font-bold uppercase" value={brand.effect || 'scanner'} onChange={e => setBrand({...brand, effect: e.target.value as any})}>
+                  <option value="none">🚫 Vazio</option>
+                  <option value="scanner">🔦 Scanner</option>
+                  <option value="glitch">📺 Glitch</option>
+                  <option value="matrix">💻 Matrix</option>
+                  <option value="gold-rain">💰 Gold Rain</option>
+                  <option value="fire">🔥 Fire</option>
+                  <option value="money">💵 Money</option>
+                  <option value="space">🚀 Space</option>
+                  <option value="aurora">🌈 Aurora</option>
+                  <option value="snow">❄️ Snow</option>
+                  <option value="lightning">⚡ Lightning</option>
+                  <option value="confetti">🎉 Confetti</option>
                 </select>
               </div>
 
@@ -442,7 +438,7 @@ const AdminPanel: React.FC = () => {
 
               <div className="space-y-2">
                 <label className="text-[9px] uppercase font-black text-gray-500 ml-2">Texto do Rodapé (Copyright)</label>
-                <input className="w-full p-4 rounded-2xl text-sm bg-black border border-white/10 text-white" value={brand.footerText || ''} onChange={e => setBrand({...brand, footerText: e.target.value})} placeholder="© 2025 Todos os direitos reservados" />
+                <input className="w-full p-4 rounded-2xl text-sm bg-black border border-white/10 text-white" value={brand.footerText || ''} onChange={e => setBrand({...brand, footerText: e.target.value})} />
               </div>
             </div>
 
@@ -453,19 +449,15 @@ const AdminPanel: React.FC = () => {
         </div>
       )}
 
-      {/* EDITOR DE LINKS */}
       {editingLink && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-[9999] overflow-y-auto">
           <form onSubmit={handleSaveLink} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-xl my-auto space-y-6">
             <h3 className="text-xl font-black uppercase text-shimmer">Configurar Plataforma</h3>
             <div className="space-y-4">
-              <div className="space-y-1">
-                 <label className="text-[8px] font-black uppercase text-gray-500 ml-2">Mover para Página:</label>
-                 <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.category || ''} onChange={e => setEditingLink({...editingLink, category: e.target.value})} placeholder="Nome da Página (Ex: Página 1)" />
-              </div>
-              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.title || ''} onChange={e => setEditingLink({...editingLink, title: e.target.value})} placeholder="Nome da Plataforma" required />
-              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.description || ''} onChange={e => setEditingLink({...editingLink, description: e.target.value})} placeholder="Descrição curta" />
-              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.url || ''} onChange={e => setEditingLink({...editingLink, url: e.target.value})} placeholder="URL (Link de Afiliado)" required />
+              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.category || ''} onChange={e => setEditingLink({...editingLink, category: e.target.value})} placeholder="Página (Ex: Página 1)" />
+              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.title || ''} onChange={e => setEditingLink({...editingLink, title: e.target.value})} placeholder="Nome" required />
+              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.description || ''} onChange={e => setEditingLink({...editingLink, description: e.target.value})} placeholder="Descrição" />
+              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.url || ''} onChange={e => setEditingLink({...editingLink, url: e.target.value})} placeholder="URL de Afiliado" required />
               <div className="grid grid-cols-2 gap-4">
                 <select className="p-4 bg-black border border-white/10 rounded-xl text-[10px] uppercase font-black" value={editingLink.type} onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}>
                   <option value="gold">Dourado</option><option value="neon-purple">Roxo</option><option value="neon-green">Verde</option><option value="glass">Vidro</option>
@@ -474,31 +466,11 @@ const AdminPanel: React.FC = () => {
                   <option value="auto">🌐 Automático</option><option value="slots">🎰 Slots</option><option value="rocket">🚀 Crash</option><option value="fire">🔥 Fogo</option>
                 </select>
               </div>
-              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.badge || ''} onChange={e => setEditingLink({...editingLink, badge: e.target.value})} placeholder="Etiqueta (Ex: PAGANDO MUITO)" />
+              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.badge || ''} onChange={e => setEditingLink({...editingLink, badge: e.target.value})} placeholder="Etiqueta" />
             </div>
             <div className="flex gap-3">
               <button type="button" onClick={() => setEditingLink(null)} className="flex-1 py-4 bg-white/5 rounded-xl uppercase font-black text-[10px]">Cancelar</button>
               <button type="submit" disabled={loading} className="flex-2 py-4 bg-yellow-500 text-black rounded-xl uppercase font-black text-[10px] shadow-lg">Confirmar</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* EDITOR DE SOCIAL */}
-      {editingSocial && (
-        <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-[9999]">
-          <form onSubmit={handleSaveSocial} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-sm space-y-6">
-            <h3 className="text-xl font-black uppercase italic">Configurar Rede Social</h3>
-            <div className="space-y-4">
-              <input className="w-full p-4 rounded-xl bg-black border border-white/10 text-sm" value={editingSocial.name || ''} onChange={e => setEditingSocial({...editingSocial, name: e.target.value})} placeholder="Nome (Ex: Instagram)" required />
-              <input className="w-full p-4 rounded-xl bg-black border border-white/10 text-sm" value={editingSocial.url || ''} onChange={e => setEditingSocial({...editingSocial, url: e.target.value})} placeholder="https://..." required />
-              <select className="w-full p-4 bg-black border border-white/10 rounded-xl text-[10px] font-black uppercase" value={editingSocial.icon} onChange={e => setEditingSocial({...editingSocial, icon: e.target.value})}>
-                 <option value="instagram">Instagram</option><option value="telegram">Telegram</option><option value="money">WhatsApp</option>
-              </select>
-            </div>
-            <div className="flex gap-3">
-              <button type="button" onClick={() => setEditingSocial(null)} className="flex-1 py-4 bg-white/5 rounded-xl uppercase font-black text-[10px]">Fechar</button>
-              <button type="submit" className="flex-2 py-4 bg-blue-600 rounded-xl uppercase font-black text-[10px]">Salvar</button>
             </div>
           </form>
         </div>
