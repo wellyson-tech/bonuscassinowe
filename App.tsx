@@ -200,6 +200,8 @@ const App: React.FC = () => {
 
         {effect === 'lightning' && <div className="lightning-flash animate-lightning" />}
 
+        {effect === 'lightning' && <div className="lightning-flash animate-lightning" />}
+
         {effect === 'glitch' && Array.from({ length: 10 }).map((_, i) => (
           <div key={i} className="glitch-line" style={{ animationDelay: `${Math.random() * 2}s`, opacity: Math.random() * 0.3 }} />
         ))}
@@ -252,7 +254,10 @@ const App: React.FC = () => {
                 </div>
               )}
             </div>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.6em] mt-3 opacity-60 text-center max-w-[280px]">{brand.tagline}</p>
+            {/* TAGLINE DESTACADA ABAIXO */}
+            <p className="text-[12px] font-bold text-white uppercase tracking-[0.3em] mt-5 px-4 text-center max-w-[320px] drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] border-t border-white/10 pt-4">
+              {brand.tagline}
+            </p>
           </div>
         </header>
 
