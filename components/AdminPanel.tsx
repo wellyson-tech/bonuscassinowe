@@ -133,18 +133,13 @@ const AdminPanel: React.FC = () => {
     e.preventDefault();
     if (!editingLink) return;
     setLoading(true);
+    
     try {
       const targetCategory = editingLink.category || activeAdminPage || 'Página 1';
       const newPos = Number(editingLink.position) || 1;
-      const otherLinksInPage = links
-        .filter(l => (l.category || 'Página 1') === targetCategory && l.id !== editingLink.id)
-        .sort((a, b) => a.position - b.position);
-
-      const reorderedList = [...otherLinksInPage];
-      reorderedList.splice(newPos - 1, 0, { ...editingLink, position: newPos } as any);
-
-      const payload = {
-        id: editingLink.id,
+      
+      // Objeto base sem o ID
+      const basePayload = {
         title: editingLink.title || 'Novo Link',
         description: editingLink.description || 'SAQUE MÍNIMO COM BÔNUS',
         url: editingLink.url || '',
@@ -152,36 +147,66 @@ const AdminPanel: React.FC = () => {
         icon: editingLink.icon || 'auto',
         badge: editingLink.badge || '',
         category: targetCategory,
-        position: newPos
+        position: newPos,
+        is_highlighted: editingLink.is_highlighted ?? false
       };
 
       if (!editingLink.id) {
-        const { data: newLinkData } = await supabase.from('links').insert([payload]).select().single();
+        // INSERÇÃO: Não envia o campo 'id'
+        const { data: newLinkData, error: insertError } = await supabase
+          .from('links')
+          .insert([basePayload])
+          .select()
+          .single();
+        
+        if (insertError) throw insertError;
+
         if (newLinkData) {
-          const newList = [...otherLinksInPage];
+          // Reordenar os outros links da mesma página para acomodar a nova posição
+          const otherLinks = links
+            .filter(l => (l.category || 'Página 1') === targetCategory && l.id !== newLinkData.id)
+            .sort((a, b) => a.position - b.position);
+          
+          const newList = [...otherLinks];
           newList.splice(newPos - 1, 0, newLinkData);
-          const updates = newList.map((l, i) => ({ id: l.id, position: i + 1, category: targetCategory }));
+          
+          const updates = newList.map((l, i) => ({ 
+            id: l.id, 
+            position: i + 1, 
+            category: targetCategory 
+          }));
+          
           await supabase.from('links').upsert(updates);
         }
       } else {
-        const finalUpdates = reorderedList.map((item, idx) => ({
+        // ATUALIZAÇÃO: Envia o campo 'id' para identificar o registro
+        const { error: updateError } = await supabase
+          .from('links')
+          .update(basePayload)
+          .eq('id', editingLink.id);
+          
+        if (updateError) throw updateError;
+
+        // Após atualizar, forçamos uma reordenação visual da página
+        const pageLinks = links
+          .filter(l => (l.category || 'Página 1') === targetCategory)
+          .map(l => l.id === editingLink.id ? { ...l, ...basePayload } : l)
+          .sort((a, b) => a.position - b.position);
+
+        const finalUpdates = pageLinks.map((item, idx) => ({
           id: item.id,
-          title: item.title,
-          description: item.description,
-          url: item.url,
-          type: item.type,
-          icon: item.icon,
-          badge: item.badge,
-          category: item.category,
           position: idx + 1
         }));
+        
         await supabase.from('links').upsert(finalUpdates);
       }
       
       setEditingLink(null);
-      fetchLinks();
+      await fetchLinks(); // Recarrega tudo
+      alert("Plataforma salva com sucesso!");
     } catch (err: any) {
-      alert("Erro ao salvar: " + err.message);
+      console.error("Erro completo:", err);
+      alert("Erro ao salvar: " + (err.message || "Verifique os campos obrigatórios."));
     } finally {
       setLoading(false);
     }
@@ -225,31 +250,27 @@ const AdminPanel: React.FC = () => {
     isLogo ? setUploadingLogo(true) : setUploadingBg(true);
 
     try {
-      // 1. Gerar nome único para evitar conflitos de cache e RLS
       const fileExt = file.name.split('.').pop();
       const fileName = `${type}-${Date.now()}-${Math.floor(Math.random() * 1000)}.${fileExt}`;
       
-      // 2. Upload para o Bucket 'brand'
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('brand')
         .upload(fileName, file, { cacheControl: '3600', upsert: true });
 
       if (uploadError) throw uploadError;
 
-      // 3. Obter URL Pública
       const { data: { publicUrl } } = supabase.storage.from('brand').getPublicUrl(fileName);
       
-      // 4. Atualizar estado local antes de persistir (UX melhor)
       if (isLogo) {
         setBrand(prev => ({ ...prev, logoUrl: publicUrl }));
       } else {
         setBrand(prev => ({ ...prev, backgroundUrl: publicUrl }));
       }
       
-      alert(`Arquivo carregado! Clique em 'Salvar Configurações' abaixo para confirmar as alterações no banco de dados.`);
+      alert(`Arquivo carregado! Clique em 'Salvar Configurações Master' para confirmar.`);
     } catch (err: any) {
       console.error("Erro no upload:", err);
-      alert("Erro no upload: " + (err.message || "Verifique as permissões do Bucket 'brand' no Supabase."));
+      alert("Erro no upload: " + (err.message || "Erro desconhecido."));
     } finally {
       isLogo ? setUploadingLogo(false) : setUploadingBg(false);
     }
@@ -270,7 +291,7 @@ const AdminPanel: React.FC = () => {
           <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter">CENTRAL DE CONTROLE</h2>
           <div className="flex items-center gap-2 mt-2">
              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-             <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black">v8.5 - Master Admin Ativo</p>
+             <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black">v8.6 - Correção de Insert Ativa</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -313,7 +334,7 @@ const AdminPanel: React.FC = () => {
             <button onClick={() => { const n = prompt("Nome da nova página:"); if(n) setActiveAdminPage(n); }} className="px-4 py-3 text-yellow-500 text-[10px] font-black uppercase tracking-widest hover:bg-yellow-500/10 rounded-full">+ Nova Página</button>
           </div>
 
-          <button onClick={() => setEditingLink({ category: activeAdminPage, description: 'SAQUE MÍNIMO COM BÔNUS', type: 'glass', icon: 'auto', position: filteredLinks.length + 1 })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">+ Adicionar em "{activeAdminPage}"</button>
+          <button onClick={() => setEditingLink({ category: activeAdminPage, description: 'SAQUE MÍNIMO COM BÔNUS', type: 'glass', icon: 'auto', position: filteredLinks.length + 1, is_highlighted: false })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">+ Adicionar em "{activeAdminPage}"</button>
 
           <div className="space-y-4">
             {filteredLinks.map((link, idx) => (
@@ -443,32 +464,57 @@ const AdminPanel: React.FC = () => {
         </div>
       )}
 
-      {/* Editor de Link e Social mantidos conforme a lógica anterior */}
       {editingLink && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-[9999] overflow-y-auto">
           <form onSubmit={handleSaveLink} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-xl my-auto space-y-6 shadow-2xl">
             <h3 className="text-xl font-black uppercase text-shimmer">Configurar Plataforma</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.title || ''} onChange={e => setEditingLink({...editingLink, title: e.target.value})} placeholder="Nome" required />
-              <input type="number" className="w-full p-4 rounded-xl text-sm bg-yellow-500/5 border border-yellow-500/30 text-yellow-500 font-bold" value={editingLink.position || ''} onChange={e => setEditingLink({...editingLink, position: parseInt(e.target.value)})} placeholder="Posição" required />
+              <div className="space-y-2">
+                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Nome da Plataforma</label>
+                <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.title || ''} onChange={e => setEditingLink({...editingLink, title: e.target.value})} placeholder="Ex: Stake" required />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Posição na Lista</label>
+                <input type="number" className="w-full p-4 rounded-xl text-sm bg-yellow-500/5 border border-yellow-500/30 text-yellow-500 font-bold" value={editingLink.position || ''} onChange={e => setEditingLink({...editingLink, position: parseInt(e.target.value)})} placeholder="1" required />
+              </div>
             </div>
-            <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.description || ''} onChange={e => setEditingLink({...editingLink, description: e.target.value})} placeholder="Descrição" />
-            <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.url || ''} onChange={e => setEditingLink({...editingLink, url: e.target.value})} placeholder="Link Afiliado" required />
-            <div className="grid grid-cols-2 gap-4">
-              <select className="p-4 bg-black border border-white/10 rounded-xl text-[10px] uppercase font-black" value={editingLink.type} onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}>
-                <option value="gold">Dourado</option><option value="neon-purple">Roxo</option><option value="neon-green">Verde</option><option value="glass">Vidro</option>
-              </select>
-              <select className="p-4 bg-black border border-white/10 rounded-xl text-[10px] uppercase font-black" value={editingLink.icon} onChange={e => setEditingLink({...editingLink, icon: e.target.value})}>
-                <option value="auto">🌐 Automático</option><option value="slots">🎰 Slots</option><option value="rocket">🚀 Crash</option><option value="fire">🔥 Fogo</option>
-              </select>
+            <div className="space-y-2">
+              <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Descrição Curta</label>
+              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.description || ''} onChange={e => setEditingLink({...editingLink, description: e.target.value})} placeholder="Ex: Pagando muito agora" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Link de Afiliado (URL)</label>
+              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.url || ''} onChange={e => setEditingLink({...editingLink, url: e.target.value})} placeholder="https://..." required />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.badge || ''} onChange={e => setEditingLink({...editingLink, badge: e.target.value})} placeholder="Etiqueta" />
-              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.category || ''} onChange={e => setEditingLink({...editingLink, category: e.target.value})} placeholder="Página" />
+              <div className="space-y-2">
+                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Estilo do Card</label>
+                <select className="w-full p-4 bg-black border border-white/10 rounded-xl text-[10px] uppercase font-black" value={editingLink.type} onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}>
+                  <option value="gold">Dourado VIP</option><option value="neon-purple">Neon Roxo</option><option value="neon-green">Neon Verde</option><option value="glass">Vidro Fosco</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Ícone</label>
+                <select className="w-full p-4 bg-black border border-white/10 rounded-xl text-[10px] uppercase font-black" value={editingLink.icon} onChange={e => setEditingLink({...editingLink, icon: e.target.value})}>
+                  <option value="auto">🌐 Automático (Favicon)</option><option value="slots">🎰 Slots</option><option value="rocket">🚀 Crash</option><option value="fire">🔥 Fogo</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Etiqueta (Badge)</label>
+                <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.badge || ''} onChange={e => setEditingLink({...editingLink, badge: e.target.value})} placeholder="Ex: Novo" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Página (Página 1, Página 2...)</label>
+                <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.category || ''} onChange={e => setEditingLink({...editingLink, category: e.target.value})} placeholder="Página 1" />
+              </div>
             </div>
             <div className="flex gap-3 pt-4">
               <button type="button" onClick={() => setEditingLink(null)} className="flex-1 py-4 bg-white/5 rounded-2xl uppercase font-black text-[10px]">Cancelar</button>
-              <button type="submit" disabled={loading} className="flex-[2] py-4 bg-yellow-500 text-black rounded-2xl uppercase font-black text-[10px] shadow-lg">Confirmar</button>
+              <button type="submit" disabled={loading} className="flex-[2] py-4 bg-yellow-500 text-black rounded-2xl uppercase font-black text-[10px] shadow-lg">
+                {loading ? 'Salvando...' : 'Confirmar e Publicar'}
+              </button>
             </div>
           </form>
         </div>
