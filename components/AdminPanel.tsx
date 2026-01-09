@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { CasinoLink, CasinoBrand, SocialLink } from '../types';
 import { Icons, BRAND as DEFAULT_BRAND, ADMIN_UID } from '../constants';
@@ -15,6 +15,9 @@ const AdminPanel: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [activeAdminPage, setActiveAdminPage] = useState<string>('');
   const [pagesOrder, setPagesOrder] = useState<string[]>([]);
+  
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const bgInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const initAdmin = async () => {
@@ -50,6 +53,40 @@ const AdminPanel: React.FC = () => {
         }
       }
     } catch (e) {}
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'bg') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${type}-${Math.random()}.${fileExt}`;
+      const filePath = `brand/${fileName}`;
+
+      // Upload para o bucket 'brand-assets'
+      const { error: uploadError } = await supabase.storage
+        .from('brand-assets')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // Pegar URL pública
+      const { data: { publicUrl } } = supabase.storage
+        .from('brand-assets')
+        .getPublicUrl(filePath);
+
+      if (type === 'logo') {
+        setBrand(prev => ({ ...prev, logoUrl: publicUrl }));
+      } else {
+        setBrand(prev => ({ ...prev, backgroundUrl: publicUrl }));
+      }
+    } catch (error: any) {
+      alert('Erro no upload: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const fetchLinks = async (targetPageToSet?: string) => {
@@ -126,7 +163,7 @@ const AdminPanel: React.FC = () => {
         effect: brand.effect
       }).eq('id', 1);
       if (error) throw error;
-      alert("Identidade atualizada com sucesso!");
+      alert("Identidade master atualizada!");
     } catch (err) { alert("Erro ao salvar marca"); } finally { setLoading(false); }
   };
 
@@ -202,17 +239,20 @@ const AdminPanel: React.FC = () => {
   return (
     <div className="w-full max-w-5xl mx-auto p-4 md:p-10 bg-[#050505] min-h-screen text-white pb-32 font-sans relative">
       {loading && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500"></div>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[9999] flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-14 w-14 border-t-2 border-b-2 border-yellow-500"></div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-yellow-500">Sincronizando Dados Master...</p>
+          </div>
         </div>
       )}
 
       <div className="flex justify-between items-center mb-10 border-b border-white/5 pb-8">
         <div>
-          <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter text-white">CENTRAL DE CONTROLE</h2>
-          <p className="text-[9px] text-gray-500 uppercase font-black mt-1">Gestão WE Master Pro</p>
+          <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter">CENTRAL DE CONTROLE</h2>
+          <p className="text-[9px] text-gray-500 uppercase font-black mt-1 tracking-widest">Painel Administrativo v3.0</p>
         </div>
-        <button onClick={() => { supabase.auth.signOut(); window.location.reload(); }} className="px-6 py-2 bg-white/5 text-red-500 border border-red-500/20 rounded-xl text-[9px] font-black uppercase hover:bg-red-500 hover:text-white transition-all">Sair</button>
+        <button onClick={() => { supabase.auth.signOut(); window.location.reload(); }} className="px-6 py-2 bg-white/5 text-red-500 border border-red-500/20 rounded-xl text-[9px] font-black uppercase hover:bg-red-500 hover:text-white transition-all">Encerrar Sessão</button>
       </div>
 
       <div className="grid grid-cols-3 gap-3 mb-12">
@@ -223,6 +263,95 @@ const AdminPanel: React.FC = () => {
         ))}
       </div>
 
+      {activeMenu === 'brand' && (
+        <div className="animate-fade-in space-y-8">
+          <form onSubmit={handleSaveBrand} className="bg-[#0f0f0f] p-8 rounded-[3rem] border border-white/5 shadow-2xl space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* UPLOAD LOGO */}
+              <div className="space-y-4">
+                <label className="text-[10px] uppercase font-black text-gray-500 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span> Avatar / Logo Master
+                </label>
+                <div className="flex items-center gap-6 bg-black/40 p-5 rounded-[2rem] border border-white/5">
+                  <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-yellow-500/30 bg-black flex-shrink-0 shadow-xl">
+                    <img src={brand.logoUrl} className="w-full h-full object-cover" alt="Preview" />
+                  </div>
+                  <div className="flex-grow space-y-2">
+                    <input type="file" ref={logoInputRef} onChange={(e) => handleFileUpload(e, 'logo')} className="hidden" accept="image/*" />
+                    <button type="button" onClick={() => logoInputRef.current?.click()} className="w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl text-[9px] font-black uppercase border border-white/10 transition-all">Alterar Imagem</button>
+                    <p className="text-[7px] text-gray-600 uppercase font-bold text-center">JPG, PNG ou GIF • Max 2MB</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* UPLOAD BACKGROUND */}
+              <div className="space-y-4">
+                <label className="text-[10px] uppercase font-black text-gray-500 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span> Fundo da Página (Background)
+                </label>
+                <div className="flex items-center gap-6 bg-black/40 p-5 rounded-[2rem] border border-white/5">
+                  <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-white/10 bg-black flex-shrink-0 shadow-xl relative">
+                    {brand.backgroundUrl ? (
+                      <img src={brand.backgroundUrl} className="w-full h-full object-cover" alt="Preview BG" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-[8px] text-gray-700">Vazio</div>
+                    )}
+                  </div>
+                  <div className="flex-grow space-y-2">
+                    <input type="file" ref={bgInputRef} onChange={(e) => handleFileUpload(e, 'bg')} className="hidden" accept="image/*" />
+                    <button type="button" onClick={() => bgInputRef.current?.click()} className="w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl text-[9px] font-black uppercase border border-white/10 transition-all">Enviar Fundo</button>
+                    <button type="button" onClick={() => setBrand({...brand, backgroundUrl: ''})} className="w-full py-2 text-red-500 text-[8px] font-black uppercase hover:bg-red-500/5 rounded-lg transition-all">Remover</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Nome da Marca</label>
+                <input className="w-full p-5 rounded-2xl bg-black border border-white/10 text-white text-sm focus:border-yellow-500 outline-none" value={brand.name} onChange={e => setBrand({...brand, name: e.target.value})} required />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Slogan Principal</label>
+                <input className="w-full p-5 rounded-2xl bg-black border border-white/10 text-white text-sm focus:border-yellow-500 outline-none" value={brand.tagline} onChange={e => setBrand({...brand, tagline: e.target.value})} required />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Efeito de Partículas</label>
+                <select className="w-full p-5 rounded-2xl bg-black border border-white/10 text-white text-sm outline-none" value={brand.effect || 'scanner'} onChange={e => setBrand({...brand, effect: e.target.value as any})}>
+                  <option value="scanner">Scanner Gold</option>
+                  <option value="gold-rain">Chuva de Ouro</option>
+                  <option value="matrix">Matrix Code</option>
+                  <option value="fire">Chamas (Ember)</option>
+                  <option value="money">Dinheiro Caindo</option>
+                  <option value="space">Espaço (Estrelas)</option>
+                  <option value="aurora">Aurora Boreal</option>
+                  <option value="glitch">Glitch Lines</option>
+                  <option value="confetti">Confetti Party</option>
+                  <option value="snow">Neve</option>
+                  <option value="lightning">Trovões (Flash)</option>
+                  <option value="none">Nenhum</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Texto do Rodapé</label>
+                <input className="w-full p-5 rounded-2xl bg-black border border-white/10 text-white text-sm focus:border-yellow-500 outline-none" value={brand.footerText?.split('ORDER:')[0] || ''} onChange={e => setBrand({...brand, footerText: e.target.value})} />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 p-5 bg-black rounded-2xl border border-white/5">
+              <input type="checkbox" id="v-brand" checked={brand.verified} onChange={e => setBrand({...brand, verified: e.target.checked})} className="w-5 h-5 accent-yellow-500" />
+              <label htmlFor="v-brand" className="text-xs font-black uppercase text-gray-300">Exibir Selo de Verificação Blue</label>
+            </div>
+            
+            <button type="submit" className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">Salvar Identidade Visual</button>
+          </form>
+        </div>
+      )}
+
+      {/* Restante do Admin Panel (Links e Social) Mantido conforme as versões anteriores */}
       {activeMenu === 'links' && (
         <div className="animate-fade-in space-y-8">
           <div className="flex flex-wrap gap-2 p-3 bg-white/[0.02] border border-white/5 rounded-[2.2rem] items-center">
@@ -287,59 +416,7 @@ const AdminPanel: React.FC = () => {
         </div>
       )}
 
-      {activeMenu === 'brand' && (
-        <form onSubmit={handleSaveBrand} className="animate-fade-in space-y-8 bg-[#0f0f0f] p-8 rounded-[3rem] border border-white/5 shadow-2xl">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Nome da Marca</label>
-              <input className="w-full p-5 rounded-2xl bg-black border border-white/10 text-white text-sm focus:border-yellow-500 outline-none" value={brand.name} onChange={e => setBrand({...brand, name: e.target.value})} required />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Slogan (Tagline)</label>
-              <input className="w-full p-5 rounded-2xl bg-black border border-white/10 text-white text-sm focus:border-yellow-500 outline-none" value={brand.tagline} onChange={e => setBrand({...brand, tagline: e.target.value})} required />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-[9px] uppercase font-black text-gray-500 ml-1">URL da Logo (Avatar)</label>
-              <input className="w-full p-5 rounded-2xl bg-black border border-white/10 text-white text-sm focus:border-yellow-500 outline-none" value={brand.logoUrl} onChange={e => setBrand({...brand, logoUrl: e.target.value})} required />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Imagem de Fundo (URL)</label>
-              <input className="w-full p-5 rounded-2xl bg-black border border-white/10 text-white text-sm focus:border-yellow-500 outline-none" value={brand.backgroundUrl || ''} onChange={e => setBrand({...brand, backgroundUrl: e.target.value})} placeholder="Opcional..." />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Efeito Visual de Fundo</label>
-              <select className="w-full p-5 rounded-2xl bg-black border border-white/10 text-white text-sm outline-none" value={brand.effect || 'scanner'} onChange={e => setBrand({...brand, effect: e.target.value as any})}>
-                <option value="scanner">Scanner Gold</option>
-                <option value="gold-rain">Chuva de Ouro</option>
-                <option value="matrix">Matrix Code</option>
-                <option value="fire">Chamas (Ember)</option>
-                <option value="money">Dinheiro Caindo</option>
-                <option value="space">Espaço (Estrelas)</option>
-                <option value="aurora">Aurora Boreal</option>
-                <option value="glitch">Glitch Lines</option>
-                <option value="confetti">Confetti Party</option>
-                <option value="snow">Neve</option>
-                <option value="lightning">Trovões (Flash)</option>
-                <option value="none">Nenhum</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Texto do Rodapé (Copyright)</label>
-              <input className="w-full p-5 rounded-2xl bg-black border border-white/10 text-white text-sm focus:border-yellow-500 outline-none" value={brand.footerText?.split('ORDER:')[0] || ''} onChange={e => setBrand({...brand, footerText: e.target.value})} placeholder="Ex: © 2025 Sua Marca" />
-            </div>
-          </div>
-          <div className="flex items-center gap-3 p-5 bg-black rounded-2xl border border-white/5">
-            <input type="checkbox" id="v-brand" checked={brand.verified} onChange={e => setBrand({...brand, verified: e.target.checked})} className="w-5 h-5 accent-yellow-500" />
-            <label htmlFor="v-brand" className="text-xs font-black uppercase text-gray-300">Exibir Selo de Verificado Profissional</label>
-          </div>
-          <button type="submit" className="w-full py-6 bg-yellow-500 text-black font-black rounded-3xl uppercase text-xs shadow-2xl shadow-yellow-500/10 hover:scale-[1.01] transition-all">Salvar Todas as Configurações de Identidade</button>
-        </form>
-      )}
-
+      {/* Modais de Edição */}
       {editingLink && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-[9999] overflow-y-auto">
           <form onSubmit={handleSaveLink} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-xl my-auto space-y-5 shadow-2xl">
