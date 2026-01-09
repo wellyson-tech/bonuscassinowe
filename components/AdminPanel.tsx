@@ -59,13 +59,12 @@ const AdminPanel: React.FC = () => {
         
         const foundCategories = Array.from(new Set(data.map(l => ((l.category as string) || 'Página 1').trim())));
 
-        // Lógica de seleção inicial
         if (targetPageToSet) {
           setActiveAdminPage(targetPageToSet);
         } else if (!activeAdminPage) {
-          // Tenta pegar a primeira da ordem salva que existe
-          const firstFromOrder = pagesOrder.find(p => foundCategories.includes(p));
-          setActiveAdminPage(firstFromOrder || foundCategories[0] || 'Página 1');
+          // Busca a primeira da ordem salva que realmente tenha links
+          const firstValid = pagesOrder.find(p => foundCategories.includes(p)) || foundCategories[0] || 'Página 1';
+          setActiveAdminPage(firstValid);
         }
       }
     } catch (e) {}
@@ -146,6 +145,7 @@ const AdminPanel: React.FC = () => {
         url: editingLink.url,
         type: editingLink.type || 'glass',
         icon: editingLink.icon || 'auto',
+        badge: editingLink.badge || '',
         category: targetCategory,
         position: editingLink.id ? editingLink.position : links.length + 1,
         is_highlighted: editingLink.is_highlighted ?? false
@@ -189,7 +189,7 @@ const AdminPanel: React.FC = () => {
       <div className="flex justify-between items-center mb-10 border-b border-white/5 pb-8">
         <div>
           <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter">CENTRAL DE CONTROLE</h2>
-          <p className="text-[9px] text-gray-500 uppercase font-black mt-1">Gestão de Categorias e Plataformas</p>
+          <p className="text-[9px] text-gray-500 uppercase font-black mt-1">Gestão de Plataformas • {activeAdminPage}</p>
         </div>
         <button onClick={() => { supabase.auth.signOut(); window.location.reload(); }} className="px-6 py-2 bg-white/5 text-red-500 border border-red-500/20 rounded-xl text-[9px] font-black uppercase hover:bg-red-500 hover:text-white transition-all">Sair</button>
       </div>
@@ -219,7 +219,7 @@ const AdminPanel: React.FC = () => {
             <button onClick={() => { const n = prompt("Nome da nova página:"); if(n) setActiveAdminPage(n.trim()); }} className="px-4 py-3 text-yellow-500 text-[10px] font-black uppercase tracking-widest hover:bg-yellow-500/10 rounded-full">+ Nova Categoria</button>
           </div>
 
-          <button onClick={() => setEditingLink({ category: activeAdminPage.trim(), type: 'glass', icon: 'auto' })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">
+          <button onClick={() => setEditingLink({ category: activeAdminPage.trim(), type: 'glass', icon: 'auto', is_highlighted: false })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">
             + Adicionar em "{activeAdminPage}"
           </button>
 
@@ -231,12 +231,17 @@ const AdminPanel: React.FC = () => {
                     <button onClick={() => moveLink(link.id!, 'up')} disabled={idx === 0} className="w-6 h-6 bg-white/5 rounded flex items-center justify-center text-[10px] hover:bg-yellow-500 hover:text-black disabled:opacity-10">▲</button>
                     <button onClick={() => moveLink(link.id!, 'down')} disabled={idx === filteredLinks.length - 1} className="w-6 h-6 bg-white/5 rounded flex items-center justify-center text-[10px] hover:bg-yellow-500 hover:text-black disabled:opacity-10">▼</button>
                   </div>
-                  <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center border border-white/10 text-yellow-500">
+                  <div className={`w-12 h-12 bg-black rounded-xl flex items-center justify-center border border-white/10 ${link.type === 'gold' ? 'text-yellow-500' : 'text-white'}`}>
                     {Icons[link.icon || 'slots'] || Icons.slots}
                   </div>
                   <div>
-                    <h4 className="font-bold text-sm uppercase">{link.title}</h4>
-                    <p className="text-[9px] text-gray-500 uppercase font-black">{link.click_count || 0} Cliques</p>
+                    <h4 className="font-bold text-sm uppercase flex items-center gap-2">
+                      {link.title}
+                      {link.badge && <span className="text-[7px] bg-yellow-500 text-black px-1.5 py-0.5 rounded-md font-black">{link.badge}</span>}
+                    </h4>
+                    <p className="text-[9px] text-gray-500 uppercase font-black">
+                      {link.click_count || 0} Cliques • Posição: {idx + 1}
+                    </p>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -251,25 +256,61 @@ const AdminPanel: React.FC = () => {
 
       {editingLink && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-[9999] overflow-y-auto">
-          <form onSubmit={handleSaveLink} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-xl my-auto space-y-6 shadow-2xl">
-            <h3 className="text-xl font-black uppercase text-shimmer">Editar Link</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Título</label>
-                <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white" value={editingLink.title || ''} onChange={e => setEditingLink({...editingLink, title: e.target.value})} required />
+          <form onSubmit={handleSaveLink} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-xl my-auto space-y-5 shadow-2xl">
+            <h3 className="text-xl font-black uppercase text-shimmer mb-4 italic">Configurar Link</h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Título do Botão</label>
+                <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white focus:border-yellow-500 outline-none" value={editingLink.title || ''} onChange={e => setEditingLink({...editingLink, title: e.target.value})} placeholder="Ex: Cadastro com Bônus" required />
               </div>
-              <div className="space-y-2">
-                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Página</label>
-                <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white" value={editingLink.category || ''} onChange={e => setEditingLink({...editingLink, category: e.target.value})} required />
+              <div className="space-y-1.5">
+                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Página (Categoria)</label>
+                <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white focus:border-yellow-500 outline-none" value={editingLink.category || ''} onChange={e => setEditingLink({...editingLink, category: e.target.value})} placeholder="Página 1" required />
               </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-[8px] uppercase font-black text-gray-500 ml-1">URL</label>
-              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white" value={editingLink.url || ''} onChange={e => setEditingLink({...editingLink, url: e.target.value})} required />
+
+            <div className="space-y-1.5">
+              <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Descrição Curta</label>
+              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white focus:border-yellow-500 outline-none" value={editingLink.description || ''} onChange={e => setEditingLink({...editingLink, description: e.target.value})} placeholder="SAQUE MÍNIMO COM BÔNUS" />
             </div>
-            <div className="flex gap-3 pt-4">
-              <button type="button" onClick={() => setEditingLink(null)} className="flex-1 py-4 bg-white/5 rounded-2xl uppercase font-black text-[10px]">Cancelar</button>
-              <button type="submit" className="flex-[2] py-4 bg-yellow-500 text-black rounded-2xl uppercase font-black text-[10px] shadow-lg">Salvar</button>
+
+            <div className="space-y-1.5">
+              <label className="text-[8px] uppercase font-black text-gray-500 ml-1">URL de Destino</label>
+              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white focus:border-yellow-500 outline-none font-mono" value={editingLink.url || ''} onChange={e => setEditingLink({...editingLink, url: e.target.value})} placeholder="https://..." required />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Tipo de Estilo</label>
+                <select className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white outline-none" value={editingLink.type || 'glass'} onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}>
+                  <option value="glass">Glass (Padrão)</option>
+                  <option value="gold">Gold (Premium)</option>
+                  <option value="neon-purple">Neon Purple</option>
+                  <option value="neon-green">Neon Green</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Ícone</label>
+                <select className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white outline-none" value={editingLink.icon || 'auto'} onChange={e => setEditingLink({...editingLink, icon: e.target.value})}>
+                  <option value="auto">Auto (Favicon)</option>
+                  {Object.keys(Icons).map(key => <option key={key} value={key}>{key}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Badge (Texto Curto)</label>
+                <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white outline-none" value={editingLink.badge || ''} onChange={e => setEditingLink({...editingLink, badge: e.target.value.toUpperCase()})} placeholder="TOP" />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 p-2 bg-white/5 rounded-xl">
+              <input type="checkbox" id="highlight" checked={editingLink.is_highlighted || false} onChange={e => setEditingLink({...editingLink, is_highlighted: e.target.checked})} className="w-4 h-4 accent-yellow-500" />
+              <label htmlFor="highlight" className="text-[10px] font-black uppercase text-gray-300">Destacar este link (Animação Extra)</label>
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t border-white/5">
+              <button type="button" onClick={() => setEditingLink(null)} className="flex-1 py-4 bg-white/5 rounded-2xl uppercase font-black text-[10px] hover:bg-white/10 transition-all">Cancelar</button>
+              <button type="submit" className="flex-[2] py-4 bg-yellow-500 text-black rounded-2xl uppercase font-black text-[10px] shadow-lg shadow-yellow-500/20 hover:scale-[1.02] active:scale-95 transition-all">Salvar Link</button>
             </div>
           </form>
         </div>
