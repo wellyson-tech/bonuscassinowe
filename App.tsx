@@ -83,17 +83,9 @@ const App: React.FC = () => {
       
       if (!error && data) {
         setLinks(data);
-        // Extrai categorias mantendo a ordem estável baseada na posição do link
-        const cats: string[] = [];
-        data.forEach(l => {
-          const name = (l.category as string || 'Página 1').trim();
-          if (!cats.includes(name)) cats.push(name);
-        });
-
+        const cats = Array.from(new Set(data.map(l => l.category || 'Página 1')));
         if (cats.length > 0) {
-          if (!activeCategory || !cats.includes(activeCategory.trim())) {
-            setActiveCategory(cats[0]);
-          }
+          if (!activeCategory || !cats.includes(activeCategory)) setActiveCategory(cats[0]);
         }
       }
     } catch (e) {}
@@ -119,31 +111,28 @@ const App: React.FC = () => {
   };
 
   const categories = useMemo(() => {
-    const cats: string[] = [];
-    links.forEach(l => {
-      const name = (l.category as string || 'Página 1').trim();
-      if (!cats.includes(name)) cats.push(name);
-    });
-    return cats.length > 0 ? cats : ['Página 1'];
+    const cats = links.map(l => l.category || 'Página 1');
+    const uniqueCats = Array.from(new Set(cats));
+    return uniqueCats.length > 0 ? uniqueCats : ['Página 1'];
   }, [links]);
 
   const filteredLinks = useMemo(() => {
-    const targetCat = (activeCategory || (categories[0] || 'Página 1')).trim();
-    return links.filter(l => (l.category as string || 'Página 1').trim() === targetCat);
+    const targetCat = activeCategory || categories[0];
+    return links.filter(l => (l.category || 'Página 1') === targetCat);
   }, [links, activeCategory, categories]);
 
   const changeCategory = (cat: string) => {
-    const cleanCat = cat.trim();
-    if (cleanCat === activeCategory.trim()) return;
+    if (cat === activeCategory) return;
     setIsTransitioning(true);
     setTimeout(() => {
-      setActiveCategory(cleanCat);
+      setActiveCategory(cat);
       setIsTransitioning(false);
     }, 300);
   };
 
   const BackgroundElements = () => {
     const effect = brand.effect || 'scanner';
+    
     return (
       <div className="effect-container">
         <div className="fixed inset-0 bg-black -z-30" />
@@ -153,37 +142,70 @@ const App: React.FC = () => {
             style={{ backgroundImage: `url(${brand.backgroundUrl})`, backgroundAttachment: 'fixed' }}
           />
         )}
+        
         {effect === 'scanner' && <div className="scanner-beam" />}
+        
         {effect === 'gold-rain' && Array.from({ length: 40 }).map((_, i) => (
           <div key={i} className="gold-particle" style={{ left: `${Math.random() * 100}%`, animationDuration: `${2 + Math.random() * 3}s`, animationDelay: `${Math.random() * 5}s` }} />
         ))}
+
         {effect === 'matrix' && Array.from({ length: 30 }).map((_, i) => (
           <div key={i} className="matrix-column" style={{ left: `${(i * 3.3)}%`, animationDuration: `${3 + Math.random() * 5}s`, animationDelay: `${Math.random() * 5}s` }}>
             {Array.from({ length: 20 }).map(() => String.fromCharCode(0x30A0 + Math.random() * 96)).join('')}
           </div>
         ))}
+
         {effect === 'fire' && Array.from({ length: 50 }).map((_, i) => (
           <div key={i} className="fire-ember" style={{ left: `${Math.random() * 100}%`, animationDuration: `${3 + Math.random() * 4}s`, animationDelay: `${Math.random() * 5}s`, width: `${2 + Math.random() * 4}px` }} />
         ))}
+
         {effect === 'money' && Array.from({ length: 20 }).map((_, i) => (
           <div key={i} className="money-item" style={{ left: `${Math.random() * 100}%`, animationDuration: `${4 + Math.random() * 6}s`, animationDelay: `${Math.random() * 8}s` }}>
             {['💵', '💰', '🎰', '💎', '🪙'][Math.floor(Math.random() * 5)]}
           </div>
         ))}
+
         {effect === 'space' && Array.from({ length: 100 }).map((_, i) => (
           <div key={i} className="star" style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%`, animationDuration: `${1 + Math.random() * 3}s`, animationDelay: `${Math.random() * 5}s` }} />
         ))}
+
         {effect === 'aurora' && <><div className="aurora-layer" style={{ top: '10%' }} /><div className="aurora-layer" style={{ top: '30%', animationDelay: '-10s', opacity: 0.5 }} /></>}
+        
         {effect === 'confetti' && Array.from({ length: 50 }).map((_, i) => (
-          <div key={i} className="confetti" style={{ left: `${Math.random() * 100}%`, backgroundColor: `hsl(${Math.random() * 360}, 70%, 60%)`, animationDuration: `${3 + Math.random() * 4}s`, animationDelay: `${Math.random() * 5}s` }} />
+          <div 
+            key={i} 
+            className="confetti" 
+            style={{ 
+              left: `${Math.random() * 100}%`, 
+              backgroundColor: `hsl(${Math.random() * 360}, 70%, 60%)`,
+              animationDuration: `${3 + Math.random() * 4}s`,
+              animationDelay: `${Math.random() * 5}s`
+            }} 
+          />
         ))}
+
         {effect === 'snow' && Array.from({ length: 60 }).map((_, i) => (
-          <div key={i} className="snow-particle" style={{ left: `${Math.random() * 100}%`, width: `${2 + Math.random() * 4}px`, height: `${2 + Math.random() * 4}px`, animationDuration: `${5 + Math.random() * 10}s`, animationDelay: `${Math.random() * 10}s` }} />
+          <div 
+            key={i} 
+            className="snow-particle" 
+            style={{ 
+              left: `${Math.random() * 100}%`, 
+              width: `${2 + Math.random() * 4}px`,
+              height: `${2 + Math.random() * 4}px`,
+              animationDuration: `${5 + Math.random() * 10}s`,
+              animationDelay: `${Math.random() * 10}s`
+            }} 
+          />
         ))}
+
         {effect === 'lightning' && <div className="lightning-flash animate-lightning" />}
+
+        {effect === 'lightning' && <div className="lightning-flash animate-lightning" />}
+
         {effect === 'glitch' && Array.from({ length: 10 }).map((_, i) => (
           <div key={i} className="glitch-line" style={{ animationDelay: `${Math.random() * 2}s`, opacity: Math.random() * 0.3 }} />
         ))}
+
         <div className="fixed inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/90 -z-15 pointer-events-none" />
       </div>
     );
@@ -196,13 +218,13 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-black relative overflow-hidden">
         <BackgroundElements />
-        <div className="w-full max-w-sm glass-card p-10 rounded-[3.5rem] text-center z-10 border border-white/10 shadow-2xl">
-          <h2 className="text-3xl font-black uppercase text-shimmer tracking-tighter italic mb-10">Admin Access</h2>
+        <div className="w-full max-w-sm glass-card p-10 rounded-[3.5rem] text-center z-10 border border-white/10">
+          <h2 className="text-3xl font-black uppercase text-shimmer tracking-tighter italic mb-10">Admin Login</h2>
           <form onSubmit={handleLogin} className="space-y-5">
-            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white outline-none focus:border-yellow-500 transition-all" placeholder="E-mail" />
-            <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white outline-none focus:border-yellow-500 font-mono transition-all" placeholder="Senha" />
-            {loginError && <p className="text-[10px] text-red-500 uppercase font-black text-center">{loginError}</p>}
-            <button type="submit" disabled={loginLoading} className="w-full py-5 bg-yellow-500 text-black font-black rounded-2xl uppercase text-[11px] tracking-widest hover:bg-yellow-400 active:scale-95 transition-all">{loginLoading ? 'Verificando...' : 'Acessar Painel Master'}</button>
+            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white outline-none focus:border-yellow-500" placeholder="E-mail" />
+            <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white outline-none focus:border-yellow-500 font-mono" placeholder="Senha" />
+            {loginError && <p className="text-[10px] text-red-500 uppercase font-black">{loginError}</p>}
+            <button type="submit" disabled={loginLoading} className="w-full py-5 bg-yellow-500 text-black font-black rounded-2xl uppercase text-[11px] tracking-widest">{loginLoading ? 'Carregando...' : 'Acessar Painel'}</button>
           </form>
         </div>
       </div>
@@ -212,6 +234,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-black text-white relative font-sans overflow-x-hidden pb-20">
       <BackgroundElements />
+      
       <main className="relative z-10 max-w-lg mx-auto px-6 py-16 flex flex-col items-center">
         <header className="text-center mb-12 w-full flex flex-col items-center">
           <div className="relative mb-8">
@@ -220,6 +243,7 @@ const App: React.FC = () => {
               <img src={brand.logoUrl} className="w-full h-full rounded-full object-cover border-[5px] border-black" alt={brand.name} />
             </div>
           </div>
+          
           <div className="flex flex-col items-center">
             <div className="flex items-center justify-center gap-3">
               <h1 className="text-4xl font-black uppercase tracking-tighter text-shimmer italic leading-tight">{brand.name}</h1>
@@ -230,12 +254,13 @@ const App: React.FC = () => {
                 </div>
               )}
             </div>
+            {/* TAGLINE DESTACADA ABAIXO */}
             <p className="text-[12px] font-bold text-white uppercase tracking-[0.3em] mt-5 px-4 text-center max-w-[320px] drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] border-t border-white/10 pt-4">
               {brand.tagline}
             </p>
           </div>
         </header>
-        
+
         {categories.length > 1 && (
           <nav className="w-full mb-12 sticky top-4 z-50 px-2">
             <div className="glass-card p-2 rounded-[2.5rem] flex items-center justify-between border border-white/5 shadow-2xl overflow-hidden relative">
@@ -243,7 +268,7 @@ const App: React.FC = () => {
                 className="absolute h-[calc(100%-16px)] bg-yellow-500 rounded-[2rem] transition-all duration-500 z-0"
                 style={{
                   width: `${100 / categories.length}%`,
-                  left: `${(categories.indexOf(activeCategory.trim()) * (100 / categories.length))}%`,
+                  left: `${(categories.indexOf(activeCategory || categories[0]) * (100 / categories.length))}%`,
                   margin: '0 8px'
                 }}
               />
@@ -252,7 +277,7 @@ const App: React.FC = () => {
                   key={cat}
                   onClick={() => changeCategory(cat)}
                   className={`relative z-10 flex-1 py-4 text-[10px] font-black uppercase tracking-widest transition-colors duration-500 ${
-                    activeCategory.trim() === cat.trim() ? 'text-black' : 'text-gray-500 hover:text-white'
+                    (activeCategory || categories[0]) === cat ? 'text-black' : 'text-gray-500 hover:text-white'
                   }`}
                 >
                   {cat}
@@ -261,6 +286,7 @@ const App: React.FC = () => {
             </div>
           </nav>
         )}
+
         <div className={`w-full space-y-6 mb-16 transition-all duration-300 min-h-[400px] ${isTransitioning ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
           {filteredLinks.map((link, idx) => (
             <div key={link.id} className="animate-fade-in-up" style={{ animationDelay: `${idx * 0.1}s` }}>
@@ -268,6 +294,7 @@ const App: React.FC = () => {
             </div>
           ))}
         </div>
+
         <footer className="w-full text-center space-y-12">
           <div className="flex justify-center gap-6">
             {socials.map((social) => (
