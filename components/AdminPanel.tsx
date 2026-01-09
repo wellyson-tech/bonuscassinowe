@@ -11,6 +11,7 @@ const AdminPanel: React.FC = () => {
   const [brand, setBrand] = useState<CasinoBrand>(DEFAULT_BRAND);
   
   const [editingLink, setEditingLink] = useState<Partial<CasinoLink> | null>(null);
+  const [editingSocial, setEditingSocial] = useState<Partial<SocialLink> | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeAdminPage, setActiveAdminPage] = useState<string>('');
   const [pagesOrder, setPagesOrder] = useState<string[]>([]);
@@ -56,13 +57,10 @@ const AdminPanel: React.FC = () => {
       const { data } = await supabase.from('links').select('*').order('position', { ascending: true });
       if (data) {
         setLinks(data);
-        
         const foundCategories = Array.from(new Set(data.map(l => ((l.category as string) || 'Página 1').trim())));
-
         if (targetPageToSet) {
           setActiveAdminPage(targetPageToSet);
         } else if (!activeAdminPage) {
-          // Busca a primeira da ordem salva que realmente tenha links
           const firstValid = pagesOrder.find(p => foundCategories.includes(p)) || foundCategories[0] || 'Página 1';
           setActiveAdminPage(firstValid);
         }
@@ -79,15 +77,11 @@ const AdminPanel: React.FC = () => {
     const currentOrder = [...sortedCategories];
     const idx = currentOrder.indexOf(categoryName.trim());
     if (idx === -1) return;
-
     const targetIdx = direction === 'left' ? idx - 1 : idx + 1;
     if (targetIdx < 0 || targetIdx >= currentOrder.length) return;
-
     const newOrder = [...currentOrder];
     [newOrder[idx], newOrder[targetIdx]] = [newOrder[targetIdx], newOrder[idx]];
-    
     setPagesOrder(newOrder);
-
     try {
         const { data: brandData } = await supabase.from('brand_settings').select('footer_text').eq('id', 1).single();
         const baseText = brandData?.footer_text?.split('ORDER:')[0] || '';
@@ -97,26 +91,64 @@ const AdminPanel: React.FC = () => {
     } catch(e) {}
   };
 
-  const moveLink = async (id: string, direction: 'up' | 'down') => {
-    const pageLinks = links
+  const jumpToPosition = async (linkId: string, newPos: number) => {
+    const pageLinks = [...links]
       .filter(l => (l.category || 'Página 1').trim() === activeAdminPage.trim())
       .sort((a, b) => a.position - b.position);
-
-    const currentIdx = pageLinks.findIndex(l => l.id === id);
+    const currentIdx = pageLinks.findIndex(l => l.id === linkId);
     if (currentIdx === -1) return;
+    const targetIdx = Math.max(0, Math.min(newPos - 1, pageLinks.length - 1));
+    if (targetIdx === currentIdx) return;
+    setLoading(true);
+    const movedItem = pageLinks.splice(currentIdx, 1)[0];
+    pageLinks.splice(targetIdx, 0, movedItem);
+    const updates = pageLinks.map((link, index) => ({ id: link.id, position: index + 1 }));
+    try {
+      await supabase.from('links').upsert(updates);
+      await fetchLinks();
+    } catch (err) { alert("Erro ao reordenar"); } finally { setLoading(false); }
+  };
 
-    const targetIdx = direction === 'up' ? currentIdx - 1 : currentIdx + 1;
-    if (targetIdx < 0 || targetIdx >= pageLinks.length) return;
+  const handleSaveBrand = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const baseText = brand.footerText?.split('ORDER:')[0] || '';
+      const finalFooter = pagesOrder.length > 0 ? `${baseText}ORDER:${JSON.stringify(pagesOrder)}` : baseText;
+      
+      const { error } = await supabase.from('brand_settings').update({
+        name: brand.name,
+        tagline: brand.tagline,
+        logo_url: brand.logoUrl,
+        background_url: brand.backgroundUrl,
+        verified: brand.verified,
+        footer_text: finalFooter,
+        effect: brand.effect
+      }).eq('id', 1);
+      if (error) throw error;
+      alert("Identidade atualizada com sucesso!");
+    } catch (err) { alert("Erro ao salvar marca"); } finally { setLoading(false); }
+  };
 
-    const currentLink = pageLinks[currentIdx];
-    const targetLink = pageLinks[targetIdx];
-
-    await supabase.from('links').upsert([
-      { id: currentLink.id, position: targetLink.position },
-      { id: targetLink.id, position: currentLink.position }
-    ]);
-
-    fetchLinks();
+  const handleSaveSocial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSocial) return;
+    setLoading(true);
+    try {
+      const payload = {
+        name: editingSocial.name,
+        url: editingSocial.url,
+        icon: editingSocial.icon || 'instagram',
+        position: editingSocial.id ? editingSocial.position : socials.length + 1
+      };
+      if (editingSocial.id) {
+        await supabase.from('social_links').update(payload).eq('id', editingSocial.id);
+      } else {
+        await supabase.from('social_links').insert([payload]);
+      }
+      setEditingSocial(null);
+      await fetchSocials();
+    } catch (err) { alert("Erro ao salvar rede social"); } finally { setLoading(false); }
   };
 
   const handleDelete = async (table: 'links' | 'social_links', id: string) => {
@@ -124,19 +156,14 @@ const AdminPanel: React.FC = () => {
     setLoading(true);
     try {
       await supabase.from(table).delete().eq('id', id);
-      await fetchLinks();
-    } catch (err) {
-      alert("Erro ao excluir");
-    } finally {
-      setLoading(false);
-    }
+      table === 'links' ? await fetchLinks() : await fetchSocials();
+    } catch (err) { alert("Erro ao excluir"); } finally { setLoading(false); }
   };
 
   const handleSaveLink = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingLink) return;
     setLoading(true);
-    
     try {
       const targetCategory = (editingLink.category || activeAdminPage || 'Página 1').trim();
       const payload = {
@@ -150,46 +177,40 @@ const AdminPanel: React.FC = () => {
         position: editingLink.id ? editingLink.position : links.length + 1,
         is_highlighted: editingLink.is_highlighted ?? false
       };
-
       if (editingLink.id) {
         await supabase.from('links').update(payload).eq('id', editingLink.id);
       } else {
         await supabase.from('links').insert([payload]);
       }
-      
       setEditingLink(null);
       await fetchLinks(targetCategory);
-    } catch (err) {
-      alert("Erro ao salvar");
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { alert("Erro ao salvar"); } finally { setLoading(false); }
   };
 
   const sortedCategories = useMemo(() => {
     const foundCats = Array.from(new Set(links.map(l => (l.category || 'Página 1').trim())));
     if (foundCats.length === 0) return ['Página 1'];
-
     const existingOrder = pagesOrder.filter(c => foundCats.includes(c));
-    foundCats.forEach(c => {
-        if (!existingOrder.includes(c)) existingOrder.push(c);
-    });
-    
+    foundCats.forEach(c => { if (!existingOrder.includes(c)) existingOrder.push(c); });
     return existingOrder;
   }, [links, pagesOrder]);
 
   const filteredLinks = useMemo(() => {
-    return links
-      .filter(l => (l.category || 'Página 1').trim() === activeAdminPage.trim())
-      .sort((a, b) => a.position - b.position);
+    return links.filter(l => (l.category || 'Página 1').trim() === activeAdminPage.trim()).sort((a, b) => a.position - b.position);
   }, [links, activeAdminPage]);
 
   return (
-    <div className="w-full max-w-5xl mx-auto p-4 md:p-10 bg-[#050505] min-h-screen text-white pb-32 font-sans">
+    <div className="w-full max-w-5xl mx-auto p-4 md:p-10 bg-[#050505] min-h-screen text-white pb-32 font-sans relative">
+      {loading && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500"></div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-10 border-b border-white/5 pb-8">
         <div>
-          <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter">CENTRAL DE CONTROLE</h2>
-          <p className="text-[9px] text-gray-500 uppercase font-black mt-1">Gestão de Plataformas • {activeAdminPage}</p>
+          <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter text-white">CENTRAL DE CONTROLE</h2>
+          <p className="text-[9px] text-gray-500 uppercase font-black mt-1">Gestão WE Master Pro</p>
         </div>
         <button onClick={() => { supabase.auth.signOut(); window.location.reload(); }} className="px-6 py-2 bg-white/5 text-red-500 border border-red-500/20 rounded-xl text-[9px] font-black uppercase hover:bg-red-500 hover:text-white transition-all">Sair</button>
       </div>
@@ -218,30 +239,19 @@ const AdminPanel: React.FC = () => {
             ))}
             <button onClick={() => { const n = prompt("Nome da nova página:"); if(n) setActiveAdminPage(n.trim()); }} className="px-4 py-3 text-yellow-500 text-[10px] font-black uppercase tracking-widest hover:bg-yellow-500/10 rounded-full">+ Nova Categoria</button>
           </div>
-
-          <button onClick={() => setEditingLink({ category: activeAdminPage.trim(), type: 'glass', icon: 'auto', is_highlighted: false })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">
-            + Adicionar em "{activeAdminPage}"
-          </button>
-
+          <button onClick={() => setEditingLink({ category: activeAdminPage.trim(), type: 'glass', icon: 'auto', is_highlighted: false })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">+ Adicionar Link em "{activeAdminPage}"</button>
           <div className="space-y-4">
             {filteredLinks.map((link, idx) => (
               <div key={link.id} className="bg-[#0f0f0f] p-5 rounded-[2rem] flex items-center justify-between border border-white/5 group">
-                <div className="flex items-center gap-4">
-                  <div className="flex flex-col gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => moveLink(link.id!, 'up')} disabled={idx === 0} className="w-6 h-6 bg-white/5 rounded flex items-center justify-center text-[10px] hover:bg-yellow-500 hover:text-black disabled:opacity-10">▲</button>
-                    <button onClick={() => moveLink(link.id!, 'down')} disabled={idx === filteredLinks.length - 1} className="w-6 h-6 bg-white/5 rounded flex items-center justify-center text-[10px] hover:bg-yellow-500 hover:text-black disabled:opacity-10">▼</button>
+                <div className="flex items-center gap-4 flex-grow">
+                  <div className="flex flex-col gap-1 items-center">
+                    <span className="text-[7px] font-black text-gray-600 uppercase">Pos</span>
+                    <input type="number" min="1" max={filteredLinks.length} defaultValue={idx + 1} onBlur={(e) => jumpToPosition(link.id!, parseInt(e.target.value))} className="w-10 h-10 bg-black border border-white/10 rounded-lg text-center text-xs font-black focus:border-yellow-500 outline-none transition-colors" />
                   </div>
-                  <div className={`w-12 h-12 bg-black rounded-xl flex items-center justify-center border border-white/10 ${link.type === 'gold' ? 'text-yellow-500' : 'text-white'}`}>
-                    {Icons[link.icon || 'slots'] || Icons.slots}
-                  </div>
+                  <div className={`w-12 h-12 bg-black rounded-xl flex items-center justify-center border border-white/10 ${link.type === 'gold' ? 'text-yellow-500' : 'text-white'}`}>{Icons[link.icon || 'slots'] || Icons.slots}</div>
                   <div>
-                    <h4 className="font-bold text-sm uppercase flex items-center gap-2">
-                      {link.title}
-                      {link.badge && <span className="text-[7px] bg-yellow-500 text-black px-1.5 py-0.5 rounded-md font-black">{link.badge}</span>}
-                    </h4>
-                    <p className="text-[9px] text-gray-500 uppercase font-black">
-                      {link.click_count || 0} Cliques • Posição: {idx + 1}
-                    </p>
+                    <h4 className="font-bold text-sm uppercase flex items-center gap-2">{link.title}{link.badge && <span className="text-[7px] bg-yellow-500 text-black px-1.5 py-0.5 rounded-md font-black">{link.badge}</span>}</h4>
+                    <p className="text-[9px] text-gray-500 uppercase font-black">{link.click_count || 0} Cliques • Estilo: {link.type}</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -254,63 +264,118 @@ const AdminPanel: React.FC = () => {
         </div>
       )}
 
+      {activeMenu === 'social' && (
+        <div className="animate-fade-in space-y-6">
+          <button onClick={() => setEditingSocial({ name: '', url: '', icon: 'instagram' })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl">+ Adicionar Rede Social</button>
+          <div className="space-y-4">
+            {socials.map((social) => (
+              <div key={social.id} className="bg-[#0f0f0f] p-5 rounded-[2rem] flex items-center justify-between border border-white/5">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center border border-white/10 text-white">{Icons[social.icon] || social.name.charAt(0)}</div>
+                  <div>
+                    <h4 className="font-bold text-sm uppercase">{social.name}</h4>
+                    <p className="text-[9px] text-gray-500 uppercase truncate max-w-[200px]">{social.url}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setEditingSocial(social)} className="w-10 h-10 bg-white/5 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors">⚙️</button>
+                  <button onClick={() => handleDelete('social_links', social.id!)} className="w-10 h-10 bg-red-600/10 text-red-500 flex items-center justify-center rounded-lg hover:bg-red-600 hover:text-white transition-colors">🗑️</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeMenu === 'brand' && (
+        <form onSubmit={handleSaveBrand} className="animate-fade-in space-y-8 bg-[#0f0f0f] p-8 rounded-[3rem] border border-white/5 shadow-2xl">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Nome da Marca</label>
+              <input className="w-full p-5 rounded-2xl bg-black border border-white/10 text-white text-sm focus:border-yellow-500 outline-none" value={brand.name} onChange={e => setBrand({...brand, name: e.target.value})} required />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Slogan (Tagline)</label>
+              <input className="w-full p-5 rounded-2xl bg-black border border-white/10 text-white text-sm focus:border-yellow-500 outline-none" value={brand.tagline} onChange={e => setBrand({...brand, tagline: e.target.value})} required />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[9px] uppercase font-black text-gray-500 ml-1">URL da Logo (Avatar)</label>
+              <input className="w-full p-5 rounded-2xl bg-black border border-white/10 text-white text-sm focus:border-yellow-500 outline-none" value={brand.logoUrl} onChange={e => setBrand({...brand, logoUrl: e.target.value})} required />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Imagem de Fundo (URL)</label>
+              <input className="w-full p-5 rounded-2xl bg-black border border-white/10 text-white text-sm focus:border-yellow-500 outline-none" value={brand.backgroundUrl || ''} onChange={e => setBrand({...brand, backgroundUrl: e.target.value})} placeholder="Opcional..." />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Efeito Visual de Fundo</label>
+              <select className="w-full p-5 rounded-2xl bg-black border border-white/10 text-white text-sm outline-none" value={brand.effect || 'scanner'} onChange={e => setBrand({...brand, effect: e.target.value as any})}>
+                <option value="scanner">Scanner Gold</option>
+                <option value="gold-rain">Chuva de Ouro</option>
+                <option value="matrix">Matrix Code</option>
+                <option value="fire">Chamas (Ember)</option>
+                <option value="money">Dinheiro Caindo</option>
+                <option value="space">Espaço (Estrelas)</option>
+                <option value="aurora">Aurora Boreal</option>
+                <option value="glitch">Glitch Lines</option>
+                <option value="confetti">Confetti Party</option>
+                <option value="snow">Neve</option>
+                <option value="lightning">Trovões (Flash)</option>
+                <option value="none">Nenhum</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Texto do Rodapé (Copyright)</label>
+              <input className="w-full p-5 rounded-2xl bg-black border border-white/10 text-white text-sm focus:border-yellow-500 outline-none" value={brand.footerText?.split('ORDER:')[0] || ''} onChange={e => setBrand({...brand, footerText: e.target.value})} placeholder="Ex: © 2025 Sua Marca" />
+            </div>
+          </div>
+          <div className="flex items-center gap-3 p-5 bg-black rounded-2xl border border-white/5">
+            <input type="checkbox" id="v-brand" checked={brand.verified} onChange={e => setBrand({...brand, verified: e.target.checked})} className="w-5 h-5 accent-yellow-500" />
+            <label htmlFor="v-brand" className="text-xs font-black uppercase text-gray-300">Exibir Selo de Verificado Profissional</label>
+          </div>
+          <button type="submit" className="w-full py-6 bg-yellow-500 text-black font-black rounded-3xl uppercase text-xs shadow-2xl shadow-yellow-500/10 hover:scale-[1.01] transition-all">Salvar Todas as Configurações de Identidade</button>
+        </form>
+      )}
+
       {editingLink && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-[9999] overflow-y-auto">
           <form onSubmit={handleSaveLink} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-xl my-auto space-y-5 shadow-2xl">
             <h3 className="text-xl font-black uppercase text-shimmer mb-4 italic">Configurar Link</h3>
-            
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Título do Botão</label>
-                <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white focus:border-yellow-500 outline-none" value={editingLink.title || ''} onChange={e => setEditingLink({...editingLink, title: e.target.value})} placeholder="Ex: Cadastro com Bônus" required />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Página (Categoria)</label>
-                <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white focus:border-yellow-500 outline-none" value={editingLink.category || ''} onChange={e => setEditingLink({...editingLink, category: e.target.value})} placeholder="Página 1" required />
-              </div>
+              <div className="space-y-1.5"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Título</label><input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white focus:border-yellow-500 outline-none" value={editingLink.title || ''} onChange={e => setEditingLink({...editingLink, title: e.target.value})} required /></div>
+              <div className="space-y-1.5"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Página</label><input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white focus:border-yellow-500 outline-none" value={editingLink.category || ''} onChange={e => setEditingLink({...editingLink, category: e.target.value})} required /></div>
             </div>
-
-            <div className="space-y-1.5">
-              <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Descrição Curta</label>
-              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white focus:border-yellow-500 outline-none" value={editingLink.description || ''} onChange={e => setEditingLink({...editingLink, description: e.target.value})} placeholder="SAQUE MÍNIMO COM BÔNUS" />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-[8px] uppercase font-black text-gray-500 ml-1">URL de Destino</label>
-              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white focus:border-yellow-500 outline-none font-mono" value={editingLink.url || ''} onChange={e => setEditingLink({...editingLink, url: e.target.value})} placeholder="https://..." required />
-            </div>
-
+            <div className="space-y-1.5"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Descrição</label><input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white focus:border-yellow-500 outline-none" value={editingLink.description || ''} onChange={e => setEditingLink({...editingLink, description: e.target.value})} /></div>
+            <div className="space-y-1.5"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">URL</label><input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white focus:border-yellow-500 outline-none" value={editingLink.url || ''} onChange={e => setEditingLink({...editingLink, url: e.target.value})} required /></div>
             <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Tipo de Estilo</label>
-                <select className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white outline-none" value={editingLink.type || 'glass'} onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}>
-                  <option value="glass">Glass (Padrão)</option>
-                  <option value="gold">Gold (Premium)</option>
-                  <option value="neon-purple">Neon Purple</option>
-                  <option value="neon-green">Neon Green</option>
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Ícone</label>
-                <select className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white outline-none" value={editingLink.icon || 'auto'} onChange={e => setEditingLink({...editingLink, icon: e.target.value})}>
-                  <option value="auto">Auto (Favicon)</option>
-                  {Object.keys(Icons).map(key => <option key={key} value={key}>{key}</option>)}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Badge (Texto Curto)</label>
-                <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white outline-none" value={editingLink.badge || ''} onChange={e => setEditingLink({...editingLink, badge: e.target.value.toUpperCase()})} placeholder="TOP" />
-              </div>
+              <div className="space-y-1.5"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Estilo</label><select className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white outline-none" value={editingLink.type || 'glass'} onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}><option value="glass">Glass</option><option value="gold">Gold</option><option value="neon-purple">Neon P</option><option value="neon-green">Neon G</option></select></div>
+              <div className="space-y-1.5"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Ícone</label><select className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white outline-none" value={editingLink.icon || 'auto'} onChange={e => setEditingLink({...editingLink, icon: e.target.value})}><option value="auto">Auto</option>{Object.keys(Icons).map(k => <option key={k} value={k}>{k}</option>)}</select></div>
+              <div className="space-y-1.5"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Badge</label><input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white outline-none" value={editingLink.badge || ''} onChange={e => setEditingLink({...editingLink, badge: e.target.value.toUpperCase()})} /></div>
             </div>
-
-            <div className="flex items-center gap-2 p-2 bg-white/5 rounded-xl">
-              <input type="checkbox" id="highlight" checked={editingLink.is_highlighted || false} onChange={e => setEditingLink({...editingLink, is_highlighted: e.target.checked})} className="w-4 h-4 accent-yellow-500" />
-              <label htmlFor="highlight" className="text-[10px] font-black uppercase text-gray-300">Destacar este link (Animação Extra)</label>
-            </div>
-
+            <div className="flex items-center gap-2 p-3 bg-white/5 rounded-xl"><input type="checkbox" id="high-check" checked={editingLink.is_highlighted} onChange={e => setEditingLink({...editingLink, is_highlighted: e.target.checked})} className="w-4 h-4 accent-yellow-500" /><label htmlFor="high-check" className="text-[9px] font-black uppercase text-gray-300">Destacar Link</label></div>
             <div className="flex gap-3 pt-4 border-t border-white/5">
-              <button type="button" onClick={() => setEditingLink(null)} className="flex-1 py-4 bg-white/5 rounded-2xl uppercase font-black text-[10px] hover:bg-white/10 transition-all">Cancelar</button>
-              <button type="submit" className="flex-[2] py-4 bg-yellow-500 text-black rounded-2xl uppercase font-black text-[10px] shadow-lg shadow-yellow-500/20 hover:scale-[1.02] active:scale-95 transition-all">Salvar Link</button>
+              <button type="button" onClick={() => setEditingLink(null)} className="flex-1 py-4 bg-white/5 rounded-2xl uppercase font-black text-[10px]">Cancelar</button>
+              <button type="submit" className="flex-[2] py-4 bg-yellow-500 text-black rounded-2xl uppercase font-black text-[10px]">Salvar</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {editingSocial && (
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-[9999]">
+          <form onSubmit={handleSaveSocial} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-xl space-y-5 shadow-2xl">
+            <h3 className="text-xl font-black uppercase text-shimmer mb-4 italic">Rede Social</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Nome</label><input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white outline-none" value={editingSocial.name || ''} onChange={e => setEditingSocial({...editingSocial, name: e.target.value})} required /></div>
+              <div className="space-y-1.5"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Ícone</label><select className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white outline-none" value={editingSocial.icon || 'instagram'} onChange={e => setEditingSocial({...editingSocial, icon: e.target.value})}><option value="instagram">Instagram</option><option value="telegram">Telegram</option><option value="facebook">Facebook</option><option value="twitter">Twitter</option><option value="whatsapp">WhatsApp</option></select></div>
+            </div>
+            <div className="space-y-1.5"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Link (URL)</label><input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white outline-none" value={editingSocial.url || ''} onChange={e => setEditingSocial({...editingSocial, url: e.target.value})} required /></div>
+            <div className="flex gap-3 pt-4 border-t border-white/5">
+              <button type="button" onClick={() => setEditingSocial(null)} className="flex-1 py-4 bg-white/5 rounded-2xl uppercase font-black text-[10px]">Cancelar</button>
+              <button type="submit" className="flex-[2] py-4 bg-yellow-500 text-black rounded-2xl uppercase font-black text-[10px]">Salvar Rede</button>
             </div>
           </form>
         </div>
