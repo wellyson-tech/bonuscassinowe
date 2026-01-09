@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from './lib/supabase';
 import { BRAND as DEFAULT_BRAND, ADMIN_UID, Icons } from './constants';
@@ -86,7 +85,6 @@ const App: React.FC = () => {
         const cats = Array.from(new Set(data.map(l => (l.category as string || 'Página 1').trim())));
         if (cats.length > 0) {
           if (!activeCategory || !cats.includes(activeCategory.trim())) {
-            // Fix: Cast unknown element from cats array to string
             setActiveCategory(cats[0] as string);
           }
         }
