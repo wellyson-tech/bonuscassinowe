@@ -50,22 +50,44 @@ const AdminPanel: React.FC = () => {
     if (data) setSocials(data);
   };
 
-  const fetchLinks = async () => {
+  const fetchLinks = async (targetPageToSet?: string) => {
     try {
       const { data } = await supabase.from('links').select('*').order('position', { ascending: true });
       if (data) {
         setLinks(data);
-        const uniqueCats = Array.from(new Set(data.map(l => l.category || 'Página 1')));
-        if (uniqueCats.length > 0 && !activeAdminPage) {
-          setActiveAdminPage(uniqueCats[0]);
-        } else if (!activeAdminPage) setActiveAdminPage('Página 1');
+        const uniqueCats = Array.from(new Set(data.map(l => ((l.category as string) || 'Página 1').trim())));
+        
+        if (targetPageToSet) {
+          setActiveAdminPage(targetPageToSet.trim());
+        } else if (uniqueCats.length > 0 && !activeAdminPage) {
+          // Fix: Cast unknown element from uniqueCats array to string
+          setActiveAdminPage(uniqueCats[0] as string);
+        } else if (!activeAdminPage) {
+          setActiveAdminPage('Página 1');
+        }
       }
     } catch (e) {}
   };
 
+  const handleDelete = async (table: 'links' | 'social_links', id: string) => {
+    if (!confirm("Tem certeza que deseja excluir?")) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase.from(table).delete().eq('id', id);
+      if (error) throw error;
+      if (table === 'links') await fetchLinks();
+      else await fetchSocials();
+    } catch (err: any) {
+      alert("Erro ao excluir: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const moveLink = async (id: string, direction: 'up' | 'down') => {
+    const currentAdminPageTrimmed = activeAdminPage.trim();
     const pageLinks = links
-      .filter(l => (l.category || 'Página 1') === activeAdminPage)
+      .filter(l => (l.category || 'Página 1').trim() === currentAdminPageTrimmed)
       .sort((a, b) => a.position - b.position);
 
     const currentIdx = pageLinks.findIndex(l => l.id === id);
@@ -86,37 +108,44 @@ const AdminPanel: React.FC = () => {
   };
 
   const moveCategory = async (category: string, direction: 'left' | 'right') => {
-    const categoriesOrder = Array.from(new Set(links.map(l => l.category || 'Página 1')));
-    const currentIdx = categoriesOrder.indexOf(category);
+    if (loading) return;
+    const categoriesOrder = Array.from(new Set(links.map(l => ((l.category as string) || 'Página 1').trim())));
+    const currentIdx = categoriesOrder.indexOf(category.trim());
     if (currentIdx === -1) return;
 
     const targetIdx = direction === 'left' ? currentIdx - 1 : currentIdx + 1;
     if (targetIdx < 0 || targetIdx >= categoriesOrder.length) return;
 
-    const targetCategory = categoriesOrder[targetIdx];
-    const currentCatLinks = links.filter(l => (l.category || 'Página 1') === category);
-    const targetCatLinks = links.filter(l => (l.category || 'Página 1') === targetCategory);
+    const targetCategoryName = categoriesOrder[targetIdx].trim();
+    const currentCategoryName = category.trim();
+    
+    const currentCatLinks = links.filter(l => (l.category || 'Página 1').trim() === currentCategoryName);
+    const targetCatLinks = links.filter(l => (l.category || 'Página 1').trim() === targetCategoryName);
 
+    // Swap category names for all links in these categories
     const updates = [
-      ...currentCatLinks.map(l => ({ id: l.id, category: targetCategory })),
-      ...targetCatLinks.map(l => ({ id: l.id, category: category }))
+      ...currentCatLinks.map(l => ({ id: l.id, category: targetCategoryName })),
+      ...targetCatLinks.map(l => ({ id: l.id, category: currentCategoryName }))
     ];
 
+    setLoading(true);
     const { error } = await supabase.from('links').upsert(updates);
+    
     if (!error) {
-      setActiveAdminPage(direction === 'left' ? targetCategory : category); 
-      fetchLinks();
+      const newActive = activeAdminPage.trim() === currentCategoryName ? targetCategoryName : activeAdminPage.trim();
+      await fetchLinks(newActive);
     }
+    setLoading(false);
   };
 
   const deepReorder = async () => {
     if (!confirm("Deseja normalizar todas as ordens (1, 2, 3...) de todas as páginas?")) return;
     setLoading(true);
-    const uniqueCats = Array.from(new Set(links.map(l => l.category || 'Página 1')));
+    const uniqueCats = Array.from(new Set(links.map(l => (l.category || 'Página 1').trim())));
     let allUpdates: any[] = [];
     uniqueCats.forEach(cat => {
       const catLinks = links
-        .filter(l => (l.category || 'Página 1') === cat)
+        .filter(l => (l.category || 'Página 1').trim() === cat)
         .sort((a, b) => a.position - b.position);
       catLinks.forEach((link, index) => {
         allUpdates.push({ id: link.id, position: index + 1 });
@@ -135,10 +164,9 @@ const AdminPanel: React.FC = () => {
     setLoading(true);
     
     try {
-      const targetCategory = editingLink.category || activeAdminPage || 'Página 1';
+      const targetCategory = (editingLink.category || activeAdminPage || 'Página 1').trim();
       const newPos = Number(editingLink.position) || 1;
       
-      // Objeto base sem o ID
       const basePayload = {
         title: editingLink.title || 'Novo Link',
         description: editingLink.description || 'SAQUE MÍNIMO COM BÔNUS',
@@ -152,7 +180,6 @@ const AdminPanel: React.FC = () => {
       };
 
       if (!editingLink.id) {
-        // INSERÇÃO: Não envia o campo 'id'
         const { data: newLinkData, error: insertError } = await supabase
           .from('links')
           .insert([basePayload])
@@ -162,9 +189,8 @@ const AdminPanel: React.FC = () => {
         if (insertError) throw insertError;
 
         if (newLinkData) {
-          // Reordenar os outros links da mesma página para acomodar a nova posição
           const otherLinks = links
-            .filter(l => (l.category || 'Página 1') === targetCategory && l.id !== newLinkData.id)
+            .filter(l => (l.category || 'Página 1').trim() === targetCategory && l.id !== newLinkData.id)
             .sort((a, b) => a.position - b.position);
           
           const newList = [...otherLinks];
@@ -179,7 +205,6 @@ const AdminPanel: React.FC = () => {
           await supabase.from('links').upsert(updates);
         }
       } else {
-        // ATUALIZAÇÃO: Envia o campo 'id' para identificar o registro
         const { error: updateError } = await supabase
           .from('links')
           .update(basePayload)
@@ -187,22 +212,22 @@ const AdminPanel: React.FC = () => {
           
         if (updateError) throw updateError;
 
-        // Após atualizar, forçamos uma reordenação visual da página
         const pageLinks = links
-          .filter(l => (l.category || 'Página 1') === targetCategory)
+          .filter(l => (l.category || 'Página 1').trim() === targetCategory)
           .map(l => l.id === editingLink.id ? { ...l, ...basePayload } : l)
           .sort((a, b) => a.position - b.position);
 
         const finalUpdates = pageLinks.map((item, idx) => ({
           id: item.id,
-          position: idx + 1
+          position: idx + 1,
+          category: targetCategory 
         }));
         
         await supabase.from('links').upsert(finalUpdates);
       }
       
       setEditingLink(null);
-      await fetchLinks(); // Recarrega tudo
+      await fetchLinks();
       alert("Plataforma salva com sucesso!");
     } catch (err: any) {
       console.error("Erro completo:", err);
@@ -210,12 +235,6 @@ const AdminPanel: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDelete = async (table: string, id: string) => {
-    if (!confirm('Excluir este item?')) return;
-    await supabase.from(table).delete().eq('id', id);
-    table === 'links' ? fetchLinks() : fetchSocials();
   };
 
   const handleSaveBrand = async (e: React.FormEvent) => {
@@ -253,7 +272,7 @@ const AdminPanel: React.FC = () => {
       const fileExt = file.name.split('.').pop();
       const fileName = `${type}-${Date.now()}-${Math.floor(Math.random() * 1000)}.${fileExt}`;
       
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('brand')
         .upload(fileName, file, { cacheControl: '3600', upsert: true });
 
@@ -276,11 +295,12 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  const uniqueCategories = useMemo(() => Array.from(new Set(links.map(l => l.category || 'Página 1'))), [links]);
+  const uniqueCategories = useMemo(() => Array.from(new Set(links.map(l => (l.category || 'Página 1').trim()))), [links]);
   
   const filteredLinks = useMemo(() => {
+    const currentAdminPage = activeAdminPage.trim();
     return links
-      .filter(l => (l.category || 'Página 1') === activeAdminPage)
+      .filter(l => (l.category || 'Página 1').trim() === currentAdminPage)
       .sort((a, b) => a.position - b.position);
   }, [links, activeAdminPage]);
 
@@ -290,8 +310,14 @@ const AdminPanel: React.FC = () => {
         <div>
           <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter">CENTRAL DE CONTROLE</h2>
           <div className="flex items-center gap-2 mt-2">
-             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-             <p className="text-[9px] text-gray-500 uppercase tracking-widest font-black">v8.6 - Correção de Insert Ativa</p>
+             <div className="flex items-center gap-1.5 px-3 py-1 bg-green-500/10 border border-green-500/20 rounded-full">
+                <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                   <svg className="w-2.5 h-2.5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                   </svg>
+                </div>
+                <p className="text-[9px] text-green-500 uppercase tracking-widest font-black">Sistema Estável & Verificado</p>
+             </div>
           </div>
         </div>
         <div className="flex gap-2">
@@ -318,23 +344,23 @@ const AdminPanel: React.FC = () => {
         <div className="animate-fade-in space-y-8">
           <div className="flex flex-wrap gap-2 p-3 bg-white/[0.02] border border-white/5 rounded-[2.2rem] items-center">
             {uniqueCategories.map((cat, idx) => (
-              <div key={cat} className="flex items-center bg-black/40 rounded-full border border-white/5 overflow-hidden shadow-lg">
+              <div key={cat as string} className="flex items-center bg-black/40 rounded-full border border-white/5 overflow-hidden shadow-lg">
                 <button 
-                  onClick={() => setActiveAdminPage(cat)} 
-                  className={`px-6 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeAdminPage === cat ? 'bg-white text-black' : 'text-gray-500 hover:text-white'}`}
+                  onClick={() => setActiveAdminPage(cat as string)} 
+                  className={`px-6 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeAdminPage.trim() === (cat as string).trim() ? 'bg-white text-black' : 'text-gray-500 hover:text-white'}`}
                 >
-                  {cat}
+                  {cat as string}
                 </button>
                 <div className="flex border-l border-white/5 bg-black/60">
-                  <button disabled={idx === 0} onClick={() => moveCategory(cat, 'left')} className="px-3 py-3 text-xs hover:text-yellow-500 disabled:opacity-20 transition-colors">←</button>
-                  <button disabled={idx === uniqueCategories.length - 1} onClick={() => moveCategory(cat, 'right')} className="px-3 py-3 text-xs hover:text-yellow-500 disabled:opacity-20 transition-colors">→</button>
+                  <button disabled={idx === 0 || loading} onClick={() => moveCategory(cat as string, 'left')} className="px-3 py-3 text-xs hover:text-yellow-500 disabled:opacity-20 transition-colors">←</button>
+                  <button disabled={idx === uniqueCategories.length - 1 || loading} onClick={() => moveCategory(cat as string, 'right')} className="px-3 py-3 text-xs hover:text-yellow-500 disabled:opacity-20 transition-colors">→</button>
                 </div>
               </div>
             ))}
-            <button onClick={() => { const n = prompt("Nome da nova página:"); if(n) setActiveAdminPage(n); }} className="px-4 py-3 text-yellow-500 text-[10px] font-black uppercase tracking-widest hover:bg-yellow-500/10 rounded-full">+ Nova Página</button>
+            <button onClick={() => { const n = prompt("Nome da nova página:"); if(n) setActiveAdminPage(n.trim()); }} className="px-4 py-3 text-yellow-500 text-[10px] font-black uppercase tracking-widest hover:bg-yellow-500/10 rounded-full">+ Nova Página</button>
           </div>
 
-          <button onClick={() => setEditingLink({ category: activeAdminPage, description: 'SAQUE MÍNIMO COM BÔNUS', type: 'glass', icon: 'auto', position: filteredLinks.length + 1, is_highlighted: false })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">+ Adicionar em "{activeAdminPage}"</button>
+          <button onClick={() => setEditingLink({ category: activeAdminPage.trim(), description: 'SAQUE MÍNIMO COM BÔNUS', type: 'glass', icon: 'auto', position: filteredLinks.length + 1, is_highlighted: false })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">+ Adicionar em "{activeAdminPage}"</button>
 
           <div className="space-y-4">
             {filteredLinks.map((link, idx) => (
@@ -355,29 +381,6 @@ const AdminPanel: React.FC = () => {
                 <div className="flex gap-2">
                   <button onClick={() => setEditingLink(link)} className="w-10 h-10 bg-white/5 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors">⚙️</button>
                   <button onClick={() => handleDelete('links', link.id!)} className="w-10 h-10 bg-red-600/10 text-red-500 flex items-center justify-center rounded-lg hover:bg-red-600 hover:text-white transition-colors">🗑️</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {activeMenu === 'social' && (
-        <div className="animate-fade-in space-y-8">
-          <button onClick={() => setEditingSocial({ icon: 'instagram' })} className="w-full py-6 bg-blue-600 text-white font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">+ Nova Rede Social</button>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {socials.map(soc => (
-              <div key={soc.id} className="bg-[#0f0f0f] p-6 rounded-[2rem] border border-white/5 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                   <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center text-blue-400">{Icons[soc.icon] || soc.name[0]}</div>
-                   <div>
-                     <p className="font-black uppercase text-xs">{soc.name}</p>
-                     <p className="text-[8px] text-gray-500 truncate max-w-[150px]">{soc.url}</p>
-                   </div>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => setEditingSocial(soc)} className="text-[10px] font-black uppercase text-blue-400">Editar</button>
-                  <button onClick={() => handleDelete('social_links', soc.id!)} className="text-[10px] font-black uppercase text-red-500">Excluir</button>
                 </div>
               </div>
             ))}
@@ -506,7 +509,7 @@ const AdminPanel: React.FC = () => {
                 <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.badge || ''} onChange={e => setEditingLink({...editingLink, badge: e.target.value})} placeholder="Ex: Novo" />
               </div>
               <div className="space-y-2">
-                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Página (Página 1, Página 2...)</label>
+                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Página (Ex: Saque Free, Bônus Roleta)</label>
                 <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.category || ''} onChange={e => setEditingLink({...editingLink, category: e.target.value})} placeholder="Página 1" />
               </div>
             </div>
