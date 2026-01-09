@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { CasinoLink, CasinoBrand, SocialLink } from '../types';
@@ -42,13 +41,11 @@ const AdminPanel: React.FC = () => {
     if (data) setSocials(data);
   };
 
-  // Função centralizada para buscar links e manter a ordem de categoria consistente
   const fetchLinks = async (targetPageToSet?: string) => {
     try {
       const { data } = await supabase.from('links').select('*').order('position', { ascending: true });
       if (data) {
         setLinks(data);
-        // Normaliza as categorias
         const cats = Array.from(new Set(data.map(l => ((l.category as string) || 'Página 1').trim())));
         
         if (targetPageToSet) {
@@ -99,11 +96,10 @@ const AdminPanel: React.FC = () => {
     if (!error) fetchLinks();
   };
 
-  // LÓGICA DE MOVIMENTAÇÃO DE PÁGINA FIXA E SEGURA
+  // LÓGICA DE MOVIMENTAÇÃO CORRIGIDA PARA TROCA DE PÁGINAS INTEIRAS
   const moveCategory = async (categoryName: string, direction: 'left' | 'right') => {
     if (loading) return;
     
-    // Pegamos a ordem ATUAL das categorias baseada nos links
     const currentCategories = Array.from(new Set(links.map(l => ((l.category as string) || 'Página 1').trim())));
     const currentIdx = currentCategories.indexOf(categoryName.trim());
     
@@ -114,30 +110,30 @@ const AdminPanel: React.FC = () => {
     const currentCatName = currentCategories[currentIdx];
     const targetCatName = currentCategories[targetIdx];
     
-    // Para mover as páginas, precisamos trocar o nome de categoria de TODOS os links
-    // Usamos um nome temporário para evitar que o banco de dados mescle as categorias durante o processo
-    const tempName = `TEMP_REORDER_${Date.now()}`;
-    
-    const linksFromCurrent = links.filter(l => (l.category || 'Página 1').trim() === currentCatName);
-    const linksFromTarget = links.filter(l => (l.category || 'Página 1').trim() === targetCatName);
+    // Nome temporário único para evitar colisão no banco de dados
+    const tempName = `REORDER_SAFE_${Date.now()}`;
 
     setLoading(true);
     try {
-      // 1. Move links da categoria atual para temporário
-      await supabase.from('links').update({ category: tempName }).eq('category', currentCatName);
-      
-      // 2. Move links da categoria alvo para a categoria atual
-      await supabase.from('links').update({ category: currentCatName }).eq('category', targetCatName);
-      
-      // 3. Move links do temporário para a categoria alvo
-      await supabase.from('links').update({ category: targetCatName }).eq('category', tempName);
+      // Usamos operações em lote para garantir que NENHUM link fique para trás
+      // Passo 1: Move os links da categoria A para um nome temporário
+      const { error: err1 } = await supabase.from('links').update({ category: tempName }).eq('category', currentCatName);
+      if (err1) throw err1;
 
-      // Mantém a visualização na página que o usuário estava (que agora mudou de nome/posição)
-      const nextActivePage = activeAdminPage === currentCatName ? targetCatName : activeAdminPage;
+      // Passo 2: Move os links da categoria B para o nome da categoria A
+      const { error: err2 } = await supabase.from('links').update({ category: currentCatName }).eq('category', targetCatName);
+      if (err2) throw err2;
+
+      // Passo 3: Move os links do nome temporário para o nome da categoria B
+      const { error: err3 } = await supabase.from('links').update({ category: targetCatName }).eq('category', tempName);
+      if (err3) throw err3;
+
+      // Atualiza a visualização para acompanhar a página que foi movida
+      const nextActivePage = activeAdminPage === currentCatName ? targetCatName : (activeAdminPage === targetCatName ? currentCatName : activeAdminPage);
       await fetchLinks(nextActivePage);
     } catch (err) {
-      console.error(err);
-      alert("Erro ao reorganizar páginas. Tente novamente.");
+      console.error("Erro na reorganização:", err);
+      alert("Falha ao mover página. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -151,7 +147,6 @@ const AdminPanel: React.FC = () => {
     try {
       const targetCategory = (editingLink.category || activeAdminPage || 'Página 1').trim();
       
-      // Ao salvar, garantimos que a posição seja o fim da lista se for novo
       const finalPosition = editingLink.id 
         ? editingLink.position 
         : (links.filter(l => (l.category || 'Página 1').trim() === targetCategory).length + 1);
@@ -183,7 +178,6 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  // Categorias únicas sempre respeitando a ordem de aparição dos links (que é controlada pelo fetch)
   const uniqueCategories = useMemo(() => {
     const cats: string[] = [];
     links.forEach(l => {
@@ -225,10 +219,9 @@ const AdminPanel: React.FC = () => {
 
       {activeMenu === 'links' && (
         <div className="animate-fade-in space-y-8">
-          {/* Navegação de Páginas no Admin */}
           <div className="flex flex-wrap gap-2 p-3 bg-white/[0.02] border border-white/5 rounded-[2.2rem] items-center">
             {uniqueCategories.map((cat, idx) => (
-              <div key={cat} className="flex items-center bg-black/40 rounded-full border border-white/5 overflow-hidden shadow-lg">
+              <div key={cat} className="flex items-center bg-black/40 rounded-full border border-white/5 overflow-hidden shadow-lg transition-all">
                 <button 
                   onClick={() => setActiveAdminPage(cat)} 
                   className={`px-6 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeAdminPage.trim() === cat.trim() ? 'bg-white text-black' : 'text-gray-500 hover:text-white'}`}
@@ -236,23 +229,44 @@ const AdminPanel: React.FC = () => {
                   {cat}
                 </button>
                 <div className="flex border-l border-white/5 bg-black/60">
-                  <button disabled={idx === 0 || loading} onClick={() => moveCategory(cat, 'left')} className="px-3 py-3 text-xs hover:text-yellow-500 disabled:opacity-20 transition-colors">←</button>
-                  <button disabled={idx === uniqueCategories.length - 1 || loading} onClick={() => moveCategory(cat, 'right')} className="px-3 py-3 text-xs hover:text-yellow-500 disabled:opacity-20 transition-colors">→</button>
+                  <button 
+                    disabled={idx === 0 || loading} 
+                    onClick={() => moveCategory(cat, 'left')} 
+                    className="px-3 py-3 text-xs hover:text-yellow-500 disabled:opacity-20 transition-colors flex items-center gap-1"
+                  >
+                    ←
+                  </button>
+                  <button 
+                    disabled={idx === uniqueCategories.length - 1 || loading} 
+                    onClick={() => moveCategory(cat, 'right')} 
+                    className="px-3 py-3 text-xs hover:text-yellow-500 disabled:opacity-20 transition-colors flex items-center gap-1"
+                  >
+                    →
+                  </button>
                 </div>
               </div>
             ))}
             <button onClick={() => { const n = prompt("Nome da nova página:"); if(n) setActiveAdminPage(n.trim()); }} className="px-4 py-3 text-yellow-500 text-[10px] font-black uppercase tracking-widest hover:bg-yellow-500/10 rounded-full">+ Adicionar Página</button>
           </div>
 
-          <button onClick={() => setEditingLink({ category: activeAdminPage.trim(), type: 'glass', icon: 'auto', description: 'SAQUE MÍNIMO COM BÔNUS' })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">+ Novo Link em "{activeAdminPage}"</button>
+          <button onClick={() => setEditingLink({ category: activeAdminPage.trim(), type: 'glass', icon: 'auto', description: 'SAQUE MÍNIMO COM BÔNUS' })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all relative overflow-hidden group">
+             <span className="relative z-10">+ Novo Link em "{activeAdminPage}"</span>
+             <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+          </button>
 
           <div className="space-y-4">
-            {filteredLinks.length === 0 && (
+            {filteredLinks.length === 0 && !loading && (
               <div className="text-center py-20 border-2 border-dashed border-white/5 rounded-[3rem]">
-                <p className="text-gray-500 text-[10px] font-black uppercase tracking-widest">Nenhuma plataforma nesta página</p>
+                <p className="text-gray-500 text-[10px] font-black uppercase tracking-widest">Página Vazia - Adicione Links</p>
               </div>
             )}
-            {filteredLinks.map((link, idx) => (
+            {loading && (
+              <div className="text-center py-10">
+                <div className="animate-spin w-8 h-8 border-4 border-yellow-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+                <p className="text-yellow-500 text-[10px] font-black uppercase tracking-widest">Sincronizando Banco de Dados...</p>
+              </div>
+            )}
+            {!loading && filteredLinks.map((link, idx) => (
               <div key={link.id} className="bg-[#0f0f0f] p-5 rounded-[2rem] flex items-center justify-between border border-white/5 group">
                 <div className="flex items-center gap-4">
                   <div className="flex flex-col gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
