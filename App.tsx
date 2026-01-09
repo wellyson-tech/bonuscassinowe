@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from './lib/supabase';
 import { BRAND as DEFAULT_BRAND, ADMIN_UID, Icons } from './constants';
@@ -82,10 +83,16 @@ const App: React.FC = () => {
       
       if (!error && data) {
         setLinks(data);
-        const cats = Array.from(new Set(data.map(l => (l.category as string || 'Página 1').trim())));
+        // Extrai categorias mantendo a ordem estável baseada na posição do link
+        const cats: string[] = [];
+        data.forEach(l => {
+          const name = (l.category as string || 'Página 1').trim();
+          if (!cats.includes(name)) cats.push(name);
+        });
+
         if (cats.length > 0) {
           if (!activeCategory || !cats.includes(activeCategory.trim())) {
-            setActiveCategory(cats[0] as string);
+            setActiveCategory(cats[0]);
           }
         }
       }
@@ -112,9 +119,12 @@ const App: React.FC = () => {
   };
 
   const categories = useMemo(() => {
-    const cats = links.map(l => (l.category as string || 'Página 1').trim());
-    const uniqueCats = Array.from(new Set(cats));
-    return uniqueCats.length > 0 ? uniqueCats : ['Página 1'];
+    const cats: string[] = [];
+    links.forEach(l => {
+      const name = (l.category as string || 'Página 1').trim();
+      if (!cats.includes(name)) cats.push(name);
+    });
+    return cats.length > 0 ? cats : ['Página 1'];
   }, [links]);
 
   const filteredLinks = useMemo(() => {
@@ -186,13 +196,13 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-black relative overflow-hidden">
         <BackgroundElements />
-        <div className="w-full max-w-sm glass-card p-10 rounded-[3.5rem] text-center z-10 border border-white/10">
-          <h2 className="text-3xl font-black uppercase text-shimmer tracking-tighter italic mb-10">Admin Login</h2>
+        <div className="w-full max-w-sm glass-card p-10 rounded-[3.5rem] text-center z-10 border border-white/10 shadow-2xl">
+          <h2 className="text-3xl font-black uppercase text-shimmer tracking-tighter italic mb-10">Admin Access</h2>
           <form onSubmit={handleLogin} className="space-y-5">
-            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white outline-none focus:border-yellow-500" placeholder="E-mail" />
-            <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white outline-none focus:border-yellow-500 font-mono" placeholder="Senha" />
-            {loginError && <p className="text-[10px] text-red-500 uppercase font-black">{loginError}</p>}
-            <button type="submit" disabled={loginLoading} className="w-full py-5 bg-yellow-500 text-black font-black rounded-2xl uppercase text-[11px] tracking-widest">{loginLoading ? 'Carregando...' : 'Acessar Painel'}</button>
+            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white outline-none focus:border-yellow-500 transition-all" placeholder="E-mail" />
+            <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white outline-none focus:border-yellow-500 font-mono transition-all" placeholder="Senha" />
+            {loginError && <p className="text-[10px] text-red-500 uppercase font-black text-center">{loginError}</p>}
+            <button type="submit" disabled={loginLoading} className="w-full py-5 bg-yellow-500 text-black font-black rounded-2xl uppercase text-[11px] tracking-widest hover:bg-yellow-400 active:scale-95 transition-all">{loginLoading ? 'Verificando...' : 'Acessar Painel Master'}</button>
           </form>
         </div>
       </div>
@@ -225,6 +235,7 @@ const App: React.FC = () => {
             </p>
           </div>
         </header>
+        
         {categories.length > 1 && (
           <nav className="w-full mb-12 sticky top-4 z-50 px-2">
             <div className="glass-card p-2 rounded-[2.5rem] flex items-center justify-between border border-white/5 shadow-2xl overflow-hidden relative">
