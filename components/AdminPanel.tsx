@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { CasinoLink, CasinoBrand, SocialLink } from '../types';
 import { Icons, BRAND as DEFAULT_BRAND, ADMIN_UID } from '../constants';
@@ -47,28 +47,23 @@ const AdminPanel: React.FC = () => {
       const { data } = await supabase.from('links').select('*').order('position', { ascending: true });
       if (data) {
         setLinks(data);
-        // Extrai categorias únicas mantendo a ordem estável baseada na posição do link
         const cats: string[] = [];
         data.forEach(l => {
           const name = ((l.category as string) || 'Página 1').trim();
           if (!cats.includes(name)) cats.push(name);
         });
         
-        if (targetPageToSet) {
-          setActiveAdminPage(targetPageToSet.trim());
-        } else if (cats.length > 0 && !activeAdminPage) {
-          setActiveAdminPage(cats[0]);
-        } else if (!activeAdminPage) {
-          setActiveAdminPage('Página 1');
-        }
+        const pageToActive = targetPageToSet?.trim() || activeAdminPage.trim() || cats[0] || 'Página 1';
+        setActiveAdminPage(pageToActive);
       }
     } catch (e) {}
   };
 
+  // CORREÇÃO: Mover categoria agora é uma operação de renomeação mútua isolada.
+  // Não há useEffects observando a ordem. Os links mantêm seu page_id (nome da categoria) intacto.
   const moveCategory = async (categoryName: string, direction: 'left' | 'right') => {
     if (loading) return;
     
-    // 1. Mapeia a ordem atual
     const cats: string[] = [];
     links.forEach(l => {
       const name = ((l.category as string) || 'Página 1').trim();
@@ -84,40 +79,37 @@ const AdminPanel: React.FC = () => {
     const currentCatName = cats[currentIdx];
     const targetCatName = cats[targetIdx];
     
-    // Nome temporário para evitar colisão durante o swap no Supabase
-    const tempName = `SWAP_TEMP_${Date.now()}`;
+    const tempName = `MOVE_ATOMIC_${Date.now()}`;
 
     setLoading(true);
     try {
-      // PROCESSO DE TROCA ATÔMICA (Simulada)
-      // Passo A: Move todos da Categoria 1 para Temporário
-      const { error: errA } = await supabase.from('links').update({ category: tempName }).eq('category', currentCatName);
-      if (errA) throw errA;
-
-      // Passo B: Move todos da Categoria 2 para o nome da Categoria 1
-      const { error: errB } = await supabase.from('links').update({ category: currentCatName }).eq('category', targetCatName);
-      if (errB) throw errB;
-
-      // Passo C: Move todos do Temporário para o nome da Categoria 2
-      const { error: errC } = await supabase.from('links').update({ category: targetCatName }).eq('category', tempName);
-      if (errC) throw errC;
-
-      // Determina qual página deve ficar ativa após o swap
-      const nextActive = activeAdminPage === currentCatName ? targetCatName : (activeAdminPage === targetCatName ? currentCatName : activeAdminPage);
+      // Operação Atômica: Troca os nomes das categorias nos links.
+      // Isso muda a ORDEM das páginas na UI (pois a ordem é derivada dos links)
+      // mas mantém os links "presos" às suas respectivas coleções.
       
-      await fetchLinks(nextActive);
+      const { error: err1 } = await supabase.from('links').update({ category: tempName }).eq('category', currentCatName);
+      if (err1) throw err1;
+
+      const { error: err2 } = await supabase.from('links').update({ category: currentCatName }).eq('category', targetCatName);
+      if (err2) throw err2;
+
+      const { error: err3 } = await supabase.from('links').update({ category: targetCatName }).eq('category', tempName);
+      if (err3) throw err3;
+
+      // Sincroniza a página ativa com o novo nome/posição
+      const newActive = activeAdminPage === currentCatName ? targetCatName : (activeAdminPage === targetCatName ? currentCatName : activeAdminPage);
+      
+      await fetchLinks(newActive);
     } catch (err) {
-      console.error("Erro no swap de categorias:", err);
-      alert("Erro ao reorganizar páginas. Verifique sua conexão.");
+      console.error("Erro ao mover página:", err);
     } finally {
       setLoading(false);
     }
   };
 
   const moveLink = async (id: string, direction: 'up' | 'down') => {
-    const currentAdminPageTrimmed = activeAdminPage.trim();
     const pageLinks = links
-      .filter(l => (l.category || 'Página 1').trim() === currentAdminPageTrimmed)
+      .filter(l => (l.category || 'Página 1').trim() === activeAdminPage.trim())
       .sort((a, b) => a.position - b.position);
 
     const currentIdx = pageLinks.findIndex(l => l.id === id);
@@ -238,9 +230,7 @@ const AdminPanel: React.FC = () => {
           </button>
 
           <div className="space-y-4">
-            {loading && (
-              <div className="text-center py-10 animate-pulse text-yellow-500 text-[10px] font-black uppercase">Sincronizando links...</div>
-            )}
+            {loading && <div className="text-center py-10 text-yellow-500 font-black uppercase text-[10px] animate-pulse">Processando...</div>}
             {!loading && filteredLinks.map((link, idx) => (
               <div key={link.id} className="bg-[#0f0f0f] p-5 rounded-[2rem] flex items-center justify-between border border-white/5 group">
                 <div className="flex items-center gap-4">
@@ -287,7 +277,7 @@ const AdminPanel: React.FC = () => {
             <div className="flex gap-3 pt-4">
               <button type="button" onClick={() => setEditingLink(null)} className="flex-1 py-4 bg-white/5 rounded-2xl uppercase font-black text-[10px]">Cancelar</button>
               <button type="submit" disabled={loading} className="flex-[2] py-4 bg-yellow-500 text-black rounded-2xl uppercase font-black text-[10px] shadow-lg">
-                {loading ? 'Sincronizando...' : 'Confirmar Alterações'}
+                {loading ? 'Salvando...' : 'Confirmar Alterações'}
               </button>
             </div>
           </form>
