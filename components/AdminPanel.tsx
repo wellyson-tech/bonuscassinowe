@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { CasinoLink, CasinoBrand, SocialLink } from '../types';
@@ -10,16 +11,8 @@ const AdminPanel: React.FC = () => {
   const [brand, setBrand] = useState<CasinoBrand>(DEFAULT_BRAND);
   
   const [editingLink, setEditingLink] = useState<Partial<CasinoLink> | null>(null);
-  const [editingSocial, setEditingSocial] = useState<Partial<SocialLink> | null>(null);
-  
   const [loading, setLoading] = useState(false);
   const [activeAdminPage, setActiveAdminPage] = useState<string>('');
-  const [savingBrand, setSavingBrand] = useState(false);
-  const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [uploadingBg, setUploadingBg] = useState(false);
-  
-  const logoInputRef = useRef<HTMLInputElement>(null);
-  const bgInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchLinks();
@@ -73,8 +66,7 @@ const AdminPanel: React.FC = () => {
     try {
       const { error } = await supabase.from(table).delete().eq('id', id);
       if (error) throw error;
-      if (table === 'links') await fetchLinks();
-      else await fetchSocials();
+      await fetchLinks();
     } catch (err: any) {
       alert("Erro ao excluir: " + err.message);
     } finally {
@@ -105,54 +97,49 @@ const AdminPanel: React.FC = () => {
     if (!error) fetchLinks();
   };
 
-  const moveCategory = async (category: string, direction: 'left' | 'right') => {
+  // LÓGICA CORRIGIDA: Move a categoria e leva TODOS os links junto
+  const moveCategory = async (categoryName: string, direction: 'left' | 'right') => {
     if (loading) return;
     const categoriesOrder = Array.from(new Set(links.map(l => ((l.category as string) || 'Página 1').trim())));
-    const currentIdx = categoriesOrder.indexOf(category.trim());
+    const currentIdx = categoriesOrder.indexOf(categoryName.trim());
+    
     if (currentIdx === -1) return;
-
     const targetIdx = direction === 'left' ? currentIdx - 1 : currentIdx + 1;
     if (targetIdx < 0 || targetIdx >= categoriesOrder.length) return;
 
     const targetCategoryName = categoriesOrder[targetIdx].trim();
-    const currentCategoryName = category.trim();
+    const currentCategoryName = categoryName.trim();
     
-    const currentCatLinks = links.filter(l => (l.category || 'Página 1').trim() === currentCategoryName);
-    const targetCatLinks = links.filter(l => (l.category || 'Página 1').trim() === targetCategoryName);
+    // Pegamos todos os links de ambas as categorias para trocar os nomes
+    const linksFromCurrent = links.filter(l => (l.category || 'Página 1').trim() === currentCategoryName);
+    const linksFromTarget = links.filter(l => (l.category || 'Página 1').trim() === targetCategoryName);
 
-    const updates = [
-      ...currentCatLinks.map(l => ({ id: l.id, category: targetCategoryName })),
-      ...targetCatLinks.map(l => ({ id: l.id, category: currentCategoryName }))
-    ];
+    // Temporário para evitar conflito se necessário, mas o Upsert resolve
+    const tempName = `TEMP_${Date.now()}`;
 
     setLoading(true);
-    const { error } = await supabase.from('links').upsert(updates);
-    
-    if (!error) {
-      const newActive = activeAdminPage.trim() === currentCategoryName ? targetCategoryName : activeAdminPage.trim();
+    try {
+      // 1. Move links da categoria atual para um nome temporário
+      const step1 = linksFromCurrent.map(l => ({ id: l.id, category: tempName }));
+      await supabase.from('links').upsert(step1);
+
+      // 2. Move links da categoria alvo para a categoria atual
+      const step2 = linksFromTarget.map(l => ({ id: l.id, category: currentCategoryName }));
+      await supabase.from('links').upsert(step2);
+
+      // 3. Move links do temporário para a categoria alvo
+      const step3 = linksFromCurrent.map(l => ({ id: l.id, category: targetCategoryName }));
+      await supabase.from('links').upsert(step3);
+
+      // Atualiza a página ativa para a nova posição se for a que o admin está vendo
+      const newActive = activeAdminPage.trim() === currentCategoryName ? targetCategoryName : activeAdminPage;
       await fetchLinks(newActive);
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao reorganizar páginas");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  };
-
-  const deepReorder = async () => {
-    if (!confirm("Deseja normalizar todas as ordens (1, 2, 3...) de todas as páginas?")) return;
-    setLoading(true);
-    const uniqueCats = Array.from(new Set(links.map(l => (l.category || 'Página 1').trim())));
-    let allUpdates: any[] = [];
-    uniqueCats.forEach(cat => {
-      const catLinks = links
-        .filter(l => (l.category || 'Página 1').trim() === cat)
-        .sort((a, b) => a.position - b.position);
-      catLinks.forEach((link, index) => {
-        allUpdates.push({ id: link.id, position: index + 1 });
-      });
-    });
-    if (allUpdates.length > 0) {
-      const { error } = await supabase.from('links').upsert(allUpdates);
-      if (!error) fetchLinks();
-    }
-    setLoading(false);
   };
 
   const handleSaveLink = async (e: React.FormEvent) => {
@@ -162,145 +149,51 @@ const AdminPanel: React.FC = () => {
     
     try {
       const targetCategory = (editingLink.category || activeAdminPage || 'Página 1').trim();
-      const newPos = Number(editingLink.position) || 1;
-      
-      const basePayload = {
-        title: editingLink.title || 'Novo Link',
-        description: editingLink.description || 'SAQUE MÍNIMO COM BÔNUS',
-        url: editingLink.url || '',
-        type: editingLink.type || 'glass',
-        icon: editingLink.icon || 'auto',
-        badge: editingLink.badge || '',
+      const payload = {
+        title: editingLink.title,
+        description: editingLink.description,
+        url: editingLink.url,
+        type: editingLink.type,
+        icon: editingLink.icon,
+        badge: editingLink.badge,
         category: targetCategory,
-        position: newPos,
+        position: editingLink.position || links.length + 1,
         is_highlighted: editingLink.is_highlighted ?? false
       };
 
-      if (!editingLink.id) {
-        const { data: newLinkData, error: insertError } = await supabase
-          .from('links')
-          .insert([basePayload])
-          .select()
-          .single();
-        
-        if (insertError) throw insertError;
-
-        if (newLinkData) {
-          const otherLinks = links
-            .filter(l => (l.category || 'Página 1').trim() === targetCategory && l.id !== newLinkData.id)
-            .sort((a, b) => a.position - b.position);
-          
-          const newList = [...otherLinks];
-          newList.splice(newPos - 1, 0, newLinkData);
-          
-          const updates = newList.map((l, i) => ({ 
-            id: l.id, 
-            position: i + 1, 
-            category: targetCategory 
-          }));
-          
-          await supabase.from('links').upsert(updates);
-        }
+      if (editingLink.id) {
+        await supabase.from('links').update(payload).eq('id', editingLink.id);
       } else {
-        const { error: updateError } = await supabase
-          .from('links')
-          .update(basePayload)
-          .eq('id', editingLink.id);
-          
-        if (updateError) throw updateError;
-
-        const pageLinks = links
-          .filter(l => (l.category || 'Página 1').trim() === targetCategory)
-          .map(l => l.id === editingLink.id ? { ...l, ...basePayload } : l)
-          .sort((a, b) => a.position - b.position);
-
-        const finalUpdates = pageLinks.map((item, idx) => ({
-          id: item.id,
-          position: idx + 1,
-          category: targetCategory 
-        }));
-        
-        await supabase.from('links').upsert(finalUpdates);
+        await supabase.from('links').insert([payload]);
       }
       
       setEditingLink(null);
       await fetchLinks();
-      alert("Plataforma salva com sucesso!");
     } catch (err: any) {
-      console.error("Erro completo:", err);
-      alert("Erro ao salvar: " + (err.message || "Verifique os campos obrigatórios."));
+      alert("Erro ao salvar link");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSaveBrand = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavingBrand(true);
-    try {
-      const { error } = await supabase.from('brand_settings').upsert({
-        id: 1,
-        name: brand.name,
-        tagline: brand.tagline,
-        logo_url: brand.logoUrl,
-        background_url: brand.backgroundUrl,
-        verified: brand.verified,
-        footer_text: brand.footerText,
-        effect: brand.effect
-      }, { onConflict: 'id' });
-      
-      if (error) throw error;
-      alert("Identidade visual salva com sucesso!");
-    } catch (err: any) {
-      alert("Erro ao salvar identidade: " + err.message);
-    } finally {
-      setSavingBrand(false);
-    }
-  };
-
   const uniqueCategories = useMemo(() => Array.from(new Set(links.map(l => (l.category || 'Página 1').trim()))), [links]);
-  
   const filteredLinks = useMemo(() => {
-    const currentAdminPage = activeAdminPage.trim();
     return links
-      .filter(l => (l.category || 'Página 1').trim() === currentAdminPage)
+      .filter(l => (l.category || 'Página 1').trim() === activeAdminPage.trim())
       .sort((a, b) => a.position - b.position);
   }, [links, activeAdminPage]);
 
   return (
     <div className="w-full max-w-5xl mx-auto p-4 md:p-10 bg-[#050505] min-h-screen text-white pb-32 font-sans">
       <div className="flex justify-between items-center mb-10 border-b border-white/5 pb-8">
-        <div>
-          <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter">CENTRAL DE CONTROLE</h2>
-          <div className="flex items-center gap-2 mt-2">
-             <div className="flex items-center gap-1.5 px-3 py-1 bg-green-500/10 border border-green-500/20 rounded-full">
-                <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
-                   <svg className="w-2.5 h-2.5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="4">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                   </svg>
-                </div>
-                <p className="text-[9px] text-green-500 uppercase tracking-widest font-black">Sistema Estável & Verificado</p>
-             </div>
-          </div>
-        </div>
-        <div className="flex gap-2">
-           <button onClick={deepReorder} className="px-4 py-2 bg-white/5 border border-white/10 text-yellow-500 rounded-xl text-[9px] font-black uppercase hover:bg-yellow-500 hover:text-black transition-all">Organizar Geral</button>
-           <button onClick={() => { supabase.auth.signOut(); window.location.reload(); }} className="px-6 py-2 bg-white/5 text-red-500 border border-red-500/20 rounded-xl text-[9px] font-black uppercase hover:bg-red-600 hover:text-white transition-all">Sair</button>
-        </div>
+        <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter">CENTRAL DE CONTROLE</h2>
+        <button onClick={() => { supabase.auth.signOut(); window.location.reload(); }} className="px-6 py-2 bg-white/5 text-red-500 border border-red-500/20 rounded-xl text-[9px] font-black uppercase">Sair</button>
       </div>
 
       <div className="grid grid-cols-3 gap-3 mb-12">
-        {(['links', 'social', 'brand'] as const).map(menu => (
-          <button 
-            key={menu}
-            onClick={() => setActiveMenu(menu)}
-            className={`py-5 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest border transition-all ${
-              activeMenu === menu ? 'bg-yellow-500 text-black border-yellow-500 shadow-lg shadow-yellow-500/20' : 'bg-white/5 text-gray-400 border-white/5 hover:bg-white/10'
-            }`}
-          >
-            {menu === 'links' ? '🎰 Plataformas' : menu === 'social' ? '📱 Redes Sociais' : '🎨 Identidade Visual'}
-          </button>
-        ))}
+        <button onClick={() => setActiveMenu('links')} className={`py-5 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest border transition-all ${activeMenu === 'links' ? 'bg-yellow-500 text-black border-yellow-500 shadow-lg' : 'bg-white/5 text-gray-400 border-white/5'}`}>Plataformas</button>
+        <button onClick={() => setActiveMenu('social')} className={`py-5 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest border transition-all ${activeMenu === 'social' ? 'bg-yellow-500 text-black border-yellow-500 shadow-lg' : 'bg-white/5 text-gray-400 border-white/5'}`}>Redes Sociais</button>
+        <button onClick={() => setActiveMenu('brand')} className={`py-5 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest border transition-all ${activeMenu === 'brand' ? 'bg-yellow-500 text-black border-yellow-500 shadow-lg' : 'bg-white/5 text-gray-400 border-white/5'}`}>Identidade</button>
       </div>
 
       {activeMenu === 'links' && (
@@ -320,10 +213,10 @@ const AdminPanel: React.FC = () => {
                 </div>
               </div>
             ))}
-            <button onClick={() => { const n = prompt("Nome da nova página:"); if(n) setActiveAdminPage(n.trim()); }} className="px-4 py-3 text-yellow-500 text-[10px] font-black uppercase tracking-widest hover:bg-yellow-500/10 rounded-full">+ Nova Página</button>
+            <button onClick={() => { const n = prompt("Nome da nova página:"); if(n) setActiveAdminPage(n.trim()); }} className="px-4 py-3 text-yellow-500 text-[10px] font-black uppercase tracking-widest">+ Nova Página</button>
           </div>
 
-          <button onClick={() => setEditingLink({ category: activeAdminPage.trim(), description: 'SAQUE MÍNIMO COM BÔNUS', type: 'glass', icon: 'auto', position: filteredLinks.length + 1, is_highlighted: false })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">+ Adicionar em "{activeAdminPage}"</button>
+          <button onClick={() => setEditingLink({ category: activeAdminPage.trim(), type: 'glass', icon: 'auto' })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl">+ Adicionar em "{activeAdminPage}"</button>
 
           <div className="space-y-4">
             {filteredLinks.map((link, idx) => (
@@ -338,7 +231,7 @@ const AdminPanel: React.FC = () => {
                   </div>
                   <div>
                     <h4 className="font-bold text-sm uppercase">{link.title}</h4>
-                    <p className="text-[9px] text-gray-500 uppercase font-black">{link.click_count || 0} Cliques • Posição: <span className="text-yellow-500">{link.position}º</span></p>
+                    <p className="text-[9px] text-gray-500 uppercase font-black">{link.click_count || 0} Cliques • Posição: {idx + 1}º</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -348,6 +241,58 @@ const AdminPanel: React.FC = () => {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {editingLink && (
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-[9999] overflow-y-auto">
+          <form onSubmit={handleSaveLink} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-xl my-auto space-y-6 shadow-2xl">
+            <h3 className="text-xl font-black uppercase text-shimmer">Configurar Plataforma</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Nome da Plataforma</label>
+                <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.title || ''} onChange={e => setEditingLink({...editingLink, title: e.target.value})} placeholder="Ex: Stake" required />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Página de Destino</label>
+                <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.category || ''} onChange={e => setEditingLink({...editingLink, category: e.target.value})} placeholder="Ex: Página 1" required />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Descrição Curta</label>
+              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.description || ''} onChange={e => setEditingLink({...editingLink, description: e.target.value})} placeholder="Ex: Pagando muito agora" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Link de Afiliado (URL)</label>
+              <input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10" value={editingLink.url || ''} onChange={e => setEditingLink({...editingLink, url: e.target.value})} placeholder="https://..." required />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Estilo do Card</label>
+                <select className="w-full p-4 bg-black border border-white/10 rounded-xl text-[10px] uppercase font-black" value={editingLink.type} onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}>
+                  <option value="gold">Dourado VIP</option>
+                  <option value="neon-purple">Neon Roxo</option>
+                  <option value="neon-green">Neon Verde</option>
+                  <option value="glass">Vidro Fosco</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Ícone</label>
+                <select className="w-full p-4 bg-black border border-white/10 rounded-xl text-[10px] uppercase font-black" value={editingLink.icon} onChange={e => setEditingLink({...editingLink, icon: e.target.value})}>
+                  <option value="auto">🌐 Automático</option>
+                  <option value="slots">🎰 Slots</option>
+                  <option value="rocket">🚀 Crash</option>
+                  <option value="fire">🔥 Fogo</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-4">
+              <button type="button" onClick={() => setEditingLink(null)} className="flex-1 py-4 bg-white/5 rounded-2xl uppercase font-black text-[10px]">Cancelar</button>
+              <button type="submit" disabled={loading} className="flex-[2] py-4 bg-yellow-500 text-black rounded-2xl uppercase font-black text-[10px] shadow-lg">
+                {loading ? 'Salvando...' : 'Confirmar e Publicar'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>
