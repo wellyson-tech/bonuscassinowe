@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from './lib/supabase';
 import { BRAND as DEFAULT_BRAND, ADMIN_UID, Icons } from './constants';
@@ -13,6 +14,7 @@ const App: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<string>('');
   const [initializing, setInitializing] = useState(true);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [pagesOrder, setPagesOrder] = useState<string[]>([]);
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -34,7 +36,9 @@ const App: React.FC = () => {
     const initApp = async () => {
       try {
         await handleNavigation();
-        await Promise.all([fetchLinks(), fetchBrand(), fetchSocials()]);
+        // Carrega marca primeiro para pegar a ordem das páginas
+        await fetchBrand();
+        await Promise.all([fetchLinks(), fetchSocials()]);
       } catch (e) {
         console.error("Erro na inicialização:", e);
       } finally {
@@ -62,14 +66,17 @@ const App: React.FC = () => {
           footerText: data.footer_text,
           effect: data.effect || 'scanner'
         });
+        
+        if (data.footer_text && data.footer_text.includes('ORDER:')) {
+            try {
+                const orderPart = data.footer_text.split('ORDER:')[1];
+                const parsedOrder = JSON.parse(orderPart);
+                if (Array.isArray(parsedOrder) && parsedOrder.length > 0) {
+                  setPagesOrder(parsedOrder);
+                }
+            } catch(e) {}
+        }
       }
-    } catch (e) {}
-  };
-
-  const fetchSocials = async () => {
-    try {
-      const { data } = await supabase.from('social_links').select('*').order('position', { ascending: true });
-      if (data) setSocials(data);
     } catch (e) {}
   };
 
@@ -82,14 +89,56 @@ const App: React.FC = () => {
       
       if (!error && data) {
         setLinks(data);
-        const cats = Array.from(new Set(data.map(l => (l.category as string || 'Página 1').trim())));
-        if (cats.length > 0) {
-          if (!activeCategory || !cats.includes(activeCategory.trim())) {
-            setActiveCategory(cats[0] as string);
-          }
-        }
       }
     } catch (e) {}
+  };
+
+  const fetchSocials = async () => {
+    try {
+      const { data } = await supabase.from('social_links').select('*').order('position', { ascending: true });
+      if (data) setSocials(data);
+    } catch (e) {}
+  };
+
+  const categories = useMemo(() => {
+    const foundCats: string[] = [];
+    links.forEach(l => {
+      const name = (l.category as string || 'Página 1').trim();
+      if (!foundCats.includes(name)) foundCats.push(name);
+    });
+
+    if (foundCats.length === 0 && pagesOrder.length === 0) return ['Página 1'];
+
+    // Filtra ordem salva
+    const ordered = pagesOrder.filter(c => foundCats.includes(c));
+    // Adiciona o que sobrou
+    foundCats.forEach(c => {
+        if (!ordered.includes(c)) ordered.push(c);
+    });
+
+    const finalCats = ordered.length > 0 ? ordered : foundCats;
+    
+    // CORREÇÃO: Garante que a categoria ativa seja uma das existentes
+    if (finalCats.length > 0 && (!activeCategory || !finalCats.includes(activeCategory))) {
+        setActiveCategory(finalCats[0]);
+    }
+    
+    return finalCats;
+  }, [links, pagesOrder, activeCategory]);
+
+  const filteredLinks = useMemo(() => {
+    const targetCat = (activeCategory || categories[0] || 'Página 1').trim();
+    return links.filter(l => (l.category as string || 'Página 1').trim() === targetCat);
+  }, [links, activeCategory, categories]);
+
+  const changeCategory = (cat: string) => {
+    const cleanCat = cat.trim();
+    if (cleanCat === activeCategory.trim()) return;
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setActiveCategory(cleanCat);
+      setIsTransitioning(false);
+    }, 300);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -109,27 +158,6 @@ const App: React.FC = () => {
     } finally {
       setLoginLoading(false);
     }
-  };
-
-  const categories = useMemo(() => {
-    const cats = links.map(l => (l.category as string || 'Página 1').trim());
-    const uniqueCats = Array.from(new Set(cats));
-    return uniqueCats.length > 0 ? uniqueCats : ['Página 1'];
-  }, [links]);
-
-  const filteredLinks = useMemo(() => {
-    const targetCat = (activeCategory || (categories[0] || 'Página 1')).trim();
-    return links.filter(l => (l.category as string || 'Página 1').trim() === targetCat);
-  }, [links, activeCategory, categories]);
-
-  const changeCategory = (cat: string) => {
-    const cleanCat = cat.trim();
-    if (cleanCat === activeCategory.trim()) return;
-    setIsTransitioning(true);
-    setTimeout(() => {
-      setActiveCategory(cleanCat);
-      setIsTransitioning(false);
-    }, 300);
   };
 
   const BackgroundElements = () => {
@@ -186,13 +214,13 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-black relative overflow-hidden">
         <BackgroundElements />
-        <div className="w-full max-w-sm glass-card p-10 rounded-[3.5rem] text-center z-10 border border-white/10">
-          <h2 className="text-3xl font-black uppercase text-shimmer tracking-tighter italic mb-10">Admin Login</h2>
+        <div className="w-full max-sm glass-card p-10 rounded-[3.5rem] text-center z-10 border border-white/10 shadow-2xl">
+          <h2 className="text-3xl font-black uppercase text-shimmer tracking-tighter italic mb-10">Admin Access</h2>
           <form onSubmit={handleLogin} className="space-y-5">
-            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white outline-none focus:border-yellow-500" placeholder="E-mail" />
-            <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white outline-none focus:border-yellow-500 font-mono" placeholder="Senha" />
-            {loginError && <p className="text-[10px] text-red-500 uppercase font-black">{loginError}</p>}
-            <button type="submit" disabled={loginLoading} className="w-full py-5 bg-yellow-500 text-black font-black rounded-2xl uppercase text-[11px] tracking-widest">{loginLoading ? 'Carregando...' : 'Acessar Painel'}</button>
+            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white outline-none focus:border-yellow-500 transition-all" placeholder="E-mail" />
+            <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white outline-none focus:border-yellow-500 font-mono transition-all" placeholder="Senha" />
+            {loginError && <p className="text-[10px] text-red-500 uppercase font-black text-center">{loginError}</p>}
+            <button type="submit" disabled={loginLoading} className="w-full py-5 bg-yellow-500 text-black font-black rounded-2xl uppercase text-[11px] tracking-widest hover:bg-yellow-400 active:scale-95 transition-all">{loginLoading ? 'Verificando...' : 'Acessar Painel Master'}</button>
           </form>
         </div>
       </div>
@@ -225,6 +253,7 @@ const App: React.FC = () => {
             </p>
           </div>
         </header>
+        
         {categories.length > 1 && (
           <nav className="w-full mb-12 sticky top-4 z-50 px-2">
             <div className="glass-card p-2 rounded-[2.5rem] flex items-center justify-between border border-white/5 shadow-2xl overflow-hidden relative">
@@ -266,7 +295,7 @@ const App: React.FC = () => {
             ))}
           </div>
           <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.4em]">
-            {brand.footerText || `${brand.name} © 2025`}
+            {brand.footerText?.split('ORDER:')[0] || `${brand.name} © 2025`}
           </p>
         </footer>
       </main>
