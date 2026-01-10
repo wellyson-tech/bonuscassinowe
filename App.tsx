@@ -36,7 +36,6 @@ const App: React.FC = () => {
     const initApp = async () => {
       try {
         await handleNavigation();
-        // Carrega marca primeiro para pegar a ordem das páginas
         await fetchBrand();
         await Promise.all([fetchLinks(), fetchSocials()]);
       } catch (e) {
@@ -52,6 +51,17 @@ const App: React.FC = () => {
       window.removeEventListener('hashchange', handleNavigation);
     };
   }, []);
+
+  // ATUALIZA O ÍCONE DO APP / FAVICON DINAMICAMENTE
+  useEffect(() => {
+    if (brand.logoUrl) {
+      const fav = document.getElementById('dynamic-favicon') as HTMLLinkElement;
+      const apple = document.getElementById('dynamic-apple-icon') as HTMLLinkElement;
+      if (fav) fav.href = brand.logoUrl;
+      if (apple) apple.href = brand.logoUrl;
+      document.title = brand.name;
+    }
+  }, [brand]);
 
   const fetchBrand = async () => {
     try {
@@ -109,16 +119,13 @@ const App: React.FC = () => {
 
     if (foundCats.length === 0 && pagesOrder.length === 0) return ['Página 1'];
 
-    // Filtra ordem salva
     const ordered = pagesOrder.filter(c => foundCats.includes(c));
-    // Adiciona o que sobrou
     foundCats.forEach(c => {
         if (!ordered.includes(c)) ordered.push(c);
     });
 
     const finalCats = ordered.length > 0 ? ordered : foundCats;
     
-    // CORREÇÃO: Garante que a categoria ativa seja uma das existentes
     if (finalCats.length > 0 && (!activeCategory || !finalCats.includes(activeCategory))) {
         setActiveCategory(finalCats[0]);
     }
