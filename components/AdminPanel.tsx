@@ -55,35 +55,39 @@ const AdminPanel: React.FC = () => {
     } catch (e) {}
   };
 
+  // Função para converter arquivo em String Base64 (Resolve erro de Bucket)
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'bg') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Verificar tamanho (Base64 aumenta o tamanho em ~33%, limitamos a 1.5MB original)
+    if (file.size > 1.5 * 1024 * 1024) {
+      alert("Arquivo muito grande! Escolha uma imagem de até 1.5MB.");
+      return;
+    }
+
     setLoading(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${type}-${Math.random()}.${fileExt}`;
-      const filePath = `brand/${fileName}`;
-
-      // Upload para o bucket 'brand-assets'
-      const { error: uploadError } = await supabase.storage
-        .from('brand-assets')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      // Pegar URL pública
-      const { data: { publicUrl } } = supabase.storage
-        .from('brand-assets')
-        .getPublicUrl(filePath);
-
+      const base64 = await convertFileToBase64(file);
+      
       if (type === 'logo') {
-        setBrand(prev => ({ ...prev, logoUrl: publicUrl }));
+        setBrand(prev => ({ ...prev, logoUrl: base64 }));
       } else {
-        setBrand(prev => ({ ...prev, backgroundUrl: publicUrl }));
+        setBrand(prev => ({ ...prev, backgroundUrl: base64 }));
       }
+      
+      alert("Imagem carregada com sucesso! Não esqueça de 'Salvar Identidade' abaixo.");
     } catch (error: any) {
-      alert('Erro no upload: ' + error.message);
+      alert('Erro ao processar imagem: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -164,7 +168,7 @@ const AdminPanel: React.FC = () => {
       }).eq('id', 1);
       if (error) throw error;
       alert("Identidade master atualizada!");
-    } catch (err) { alert("Erro ao salvar marca"); } finally { setLoading(false); }
+    } catch (err) { alert("Erro ao salvar marca: Verifique se a imagem não é muito pesada."); } finally { setLoading(false); }
   };
 
   const handleSaveSocial = async (e: React.FormEvent) => {
@@ -279,7 +283,7 @@ const AdminPanel: React.FC = () => {
                   <div className="flex-grow space-y-2">
                     <input type="file" ref={logoInputRef} onChange={(e) => handleFileUpload(e, 'logo')} className="hidden" accept="image/*" />
                     <button type="button" onClick={() => logoInputRef.current?.click()} className="w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl text-[9px] font-black uppercase border border-white/10 transition-all">Alterar Imagem</button>
-                    <p className="text-[7px] text-gray-600 uppercase font-bold text-center">JPG, PNG ou GIF • Max 2MB</p>
+                    <p className="text-[7px] text-gray-600 uppercase font-bold text-center">Base64 • Max 1.5MB</p>
                   </div>
                 </div>
               </div>
@@ -351,7 +355,6 @@ const AdminPanel: React.FC = () => {
         </div>
       )}
 
-      {/* Restante do Admin Panel (Links e Social) Mantido conforme as versões anteriores */}
       {activeMenu === 'links' && (
         <div className="animate-fade-in space-y-8">
           <div className="flex flex-wrap gap-2 p-3 bg-white/[0.02] border border-white/5 rounded-[2.2rem] items-center">
