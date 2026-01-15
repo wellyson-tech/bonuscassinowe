@@ -4,122 +4,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grupo Bet - VIP Sinais</title>
+    <title>Grupo Bet VIP - Sinais de Alta Assertividade</title>
+    <!-- Tailwind para utilitários rápidos -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Estilos específicos da página -->
+    <link rel="stylesheet" href="grupobet.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            background-color: #000;
-            color: #fff;
-            margin: 0;
-            overflow-x: hidden;
-            min-height: 100vh;
-        }
-        .gold-gradient {
-            background: linear-gradient(135deg, #fceabb 0%, #fccd4d 50%, #f8b500 51%, #fbdf93 100%);
-            color: #000;
-        }
-        .glass-card {
-            background: rgba(15, 15, 15, 0.8);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        .animate-float {
-            animation: float 4s infinite ease-in-out;
-        }
-        @keyframes float {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
-        }
-        .shimmer {
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            background-size: 200% 100%;
-            animation: shimmer 2s infinite;
-        }
-        @keyframes shimmer {
-            0% { background-position: -200% 0; }
-            100% { background-position: 200% 0; }
-        }
-        .text-shimmer {
-            background: linear-gradient(to right, #d4af37 20%, #fff4d6 40%, #fff4d6 60%, #d4af37 80%);
-            background-size: 200% auto;
-            color: transparent;
-            -webkit-background-clip: text;
-            background-clip: text;
-            animation: shine 3s linear infinite;
-        }
-        @keyframes shine {
-            to { background-position: 200% center; }
-        }
-    </style>
 </head>
-<body class="flex flex-col items-center justify-center p-6 relative">
-    <!-- Fundo de Efeito -->
-    <div class="fixed inset-0 pointer-events-none opacity-20 -z-10">
-        <div class="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-yellow-600 rounded-full blur-[120px]"></div>
-        <div class="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-yellow-900 rounded-full blur-[120px]"></div>
-    </div>
+<body class="grupobet">
+    <!-- Efeito de partículas de fundo -->
+    <div id="particles-container"></div>
 
-    <main class="w-full max-w-md text-center opacity-0 translate-y-4 transition-all duration-700 ease-out" id="main-content">
-        <!-- Logo -->
-        <div class="mb-10 flex justify-center">
-            <div class="w-28 h-28 rounded-full border-4 border-yellow-500 shadow-[0_0_40px_rgba(234,179,8,0.3)] animate-float overflow-hidden">
-                <img src="https://i.postimg.cc/fbp0thJQ/att.jpg" alt="Logo Master" class="w-full h-full object-cover">
+    <main class="content-wrapper">
+        <header class="fade-in">
+            <div class="logo-container">
+                <img src="https://i.postimg.cc/fbp0thJQ/att.jpg" alt="Logo VIP" class="logo-img">
             </div>
+            <h1 class="title">GRUPO BET <span class="gold-text">VIP</span></h1>
+            <p class="subtitle">SINAIS EXCLUSIVOS VIA IA</p>
+        </header>
+
+        <section class="info-grid">
+            <div class="glass-card fade-in-up" style="animation-delay: 0.2s">
+                <div class="icon-box green">✓</div>
+                <div class="text-box">
+                    <span class="label">ASSERTIVIDADE</span>
+                    <span class="value">98.4%</span>
+                </div>
+            </div>
+            <div class="glass-card fade-in-up" style="animation-delay: 0.4s">
+                <div class="icon-box blue">⚡</div>
+                <div class="text-box">
+                    <span class="label">FREQUÊNCIA</span>
+                    <span class="value">24H / DIA</span>
+                </div>
+            </div>
+        </section>
+
+        <div class="cta-container fade-in-up" style="animation-delay: 0.6s">
+            <a href="https://t.me/bonuscassinowe1" target="_blank" class="cta-button">
+                <span class="shimmer-effect"></span>
+                ENTRAR NO GRUPO AGORA
+            </a>
+            <p class="limit-warning">VAGAS LIMITADAS DISPONÍVEIS</p>
         </div>
 
-        <h1 class="text-4xl font-black uppercase tracking-tighter mb-2 italic text-shimmer">Grupo Bet VIP</h1>
-        <p class="text-gray-400 text-[10px] font-black uppercase tracking-[0.4em] mb-12">Inteligência Artificial & Lucro</p>
-
-        <!-- Benefícios -->
-        <div class="glass-card rounded-[3rem] p-8 mb-10 space-y-6">
-            <div class="flex items-center gap-5 text-left group">
-                <div class="w-12 h-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center text-yellow-500 group-hover:scale-110 transition-transform">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                </div>
-                <div>
-                    <h3 class="text-[9px] text-gray-500 uppercase font-black tracking-widest">Assertividade Real</h3>
-                    <p class="text-lg font-bold">Taxa de 98% em Sinais</p>
-                </div>
-            </div>
-            
-            <div class="flex items-center gap-5 text-left group">
-                <div class="w-12 h-12 rounded-2xl bg-green-500/10 flex items-center justify-center text-green-500 group-hover:scale-110 transition-transform">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                </div>
-                <div>
-                    <h3 class="text-[9px] text-gray-500 uppercase font-black tracking-widest">Velocidade</h3>
-                    <p class="text-lg font-bold">Alertas Instantâneos 24h</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Botão CTA -->
-        <a href="https://t.me/bonuscassinowe1" target="_blank" class="block w-full gold-gradient py-6 rounded-[2.5rem] font-black uppercase text-xs tracking-widest shadow-[0_20px_40px_rgba(234,179,8,0.3)] hover:scale-[1.03] active:scale-95 transition-all relative overflow-hidden">
-            <span class="relative z-10">Acessar Grupo de Sinais</span>
-            <div class="shimmer absolute inset-0 opacity-40"></div>
-        </a>
-
-        <p class="mt-8 text-[8px] text-gray-600 uppercase font-black tracking-[0.3em]">
-            Acesso Gratuito por Tempo Limitado
-        </p>
-
-        <!-- Link Voltar -->
-        <a href="/" class="mt-16 inline-flex items-center gap-2 text-gray-500 text-[10px] font-black uppercase tracking-widest hover:text-yellow-500 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-            Voltar ao Início
-        </a>
+        <footer class="fade-in" style="animation-delay: 0.8s">
+            <a href="/" class="back-link">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                VOLTAR AO INÍCIO
+            </a>
+        </footer>
     </main>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const main = document.getElementById('main-content');
-            setTimeout(() => {
-                main.classList.remove('opacity-0', 'translate-y-4');
-                main.classList.add('opacity-100', 'translate-y-0');
-            }, 100);
-        });
-    </script>
+    <!-- Script específico da página -->
+    <script src="grupobet.js"></script>
 </body>
 </html>

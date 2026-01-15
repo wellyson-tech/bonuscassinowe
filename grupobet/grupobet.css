@@ -1,0 +1,203 @@
+
+/* Isolamento total usando a classe da body */
+body.grupobet {
+    margin: 0;
+    padding: 0;
+    background-color: #020202;
+    color: #ffffff;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow-x: hidden;
+}
+
+.grupobet .content-wrapper {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 440px;
+    padding: 2rem;
+    text-align: center;
+}
+
+/* Background Effects */
+#particles-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    background: radial-gradient(circle at 50% 50%, #1a1500 0%, #000000 100%);
+}
+
+/* Logo & Headers */
+.grupobet .logo-container {
+    margin: 0 auto 1.5rem;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    padding: 4px;
+    background: linear-gradient(135deg, #fccd4d, #f8b500);
+    box-shadow: 0 0 30px rgba(248, 181, 0, 0.3);
+}
+
+.grupobet .logo-img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 4px solid #000;
+}
+
+.grupobet .title {
+    font-size: 2.25rem;
+    font-weight: 900;
+    letter-spacing: -0.05em;
+    font-style: italic;
+    margin-bottom: 0.5rem;
+}
+
+.grupobet .gold-text {
+    background: linear-gradient(to right, #fceabb, #fccd4d, #f8b500);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.grupobet .subtitle {
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #666;
+    letter-spacing: 0.4em;
+    margin-bottom: 3rem;
+}
+
+/* Cards */
+.grupobet .info-grid {
+    display: grid;
+    gap: 1rem;
+    margin-bottom: 2.5rem;
+}
+
+.grupobet .glass-card {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 1.5rem;
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    transition: transform 0.3s ease;
+}
+
+.grupobet .glass-card:hover {
+    transform: translateY(-5px);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.grupobet .icon-box {
+    width: 48px;
+    height: 48px;
+    border-radius: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
+
+.grupobet .icon-box.green { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
+.grupobet .icon-box.blue { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+
+.grupobet .text-box { text-align: left; }
+.grupobet .label { display: block; font-size: 0.65rem; font-weight: 800; color: #555; }
+.grupobet .value { display: block; font-size: 1.1rem; font-weight: 700; }
+
+/* CTA Button */
+.grupobet .cta-button {
+    display: block;
+    width: 100%;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #fccd4d, #f8b500);
+    color: #000;
+    text-decoration: none;
+    font-weight: 900;
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+    border-radius: 1.25rem;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(248, 181, 0, 0.2);
+    transition: all 0.3s ease;
+}
+
+.grupobet .cta-button:hover {
+    transform: scale(1.02);
+    box-shadow: 0 15px 40px rgba(248, 181, 0, 0.4);
+}
+
+.grupobet .limit-warning {
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: #f8b500;
+    margin-top: 1rem;
+    animation: pulse 2s infinite;
+}
+
+.grupobet .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #444;
+    text-decoration: none;
+    font-size: 0.7rem;
+    font-weight: 800;
+    margin-top: 3rem;
+    transition: color 0.3s;
+}
+
+.grupobet .back-link:hover { color: #fff; }
+
+/* Animations */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.grupobet .fade-in {
+    animation: fadeIn 1s ease forwards;
+}
+
+.grupobet .fade-in-up {
+    opacity: 0;
+    animation: fadeInUp 0.8s ease forwards;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.grupobet .shimmer-effect {
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(to right, transparent, rgba(255,255,255,0.4), transparent);
+    transform: skewX(-25deg);
+    animation: shimmer 3s infinite;
+}
+
+@keyframes shimmer {
+    from { left: -100%; }
+    to { left: 200%; }
+}
