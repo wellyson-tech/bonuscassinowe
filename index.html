@@ -20,7 +20,12 @@
         color: white;
         margin: 0;
         padding: 0;
-        overflow-x: hidden;
+      }
+
+      #root {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
       }
 
       select option {
@@ -52,7 +57,6 @@
       .bg-main {
         background: #000;
         min-height: 100vh;
-        position: relative;
       }
 
       .ig-verified-wrapper {
@@ -92,7 +96,6 @@
         to { background-position: 200% center; }
       }
 
-      /* EFEITOS DE FUNDO */
       .effect-container {
         position: fixed;
         inset: 0;
@@ -101,7 +104,6 @@
         overflow: hidden;
       }
 
-      /* 1. SCANNER */
       .scanner-beam {
         position: absolute;
         top: 0; left: -150%; width: 120%; height: 100%;
@@ -113,7 +115,6 @@
         100% { transform: translateX(200%) skewX(-15deg); }
       }
 
-      /* 2. CHUVA DE OURO */
       .gold-particle {
         position: absolute;
         width: 2px;
@@ -124,7 +125,6 @@
       }
       @keyframes fall { to { transform: translateY(110vh); } }
 
-      /* 3. MATRIX */
       .matrix-column {
         position: absolute;
         top: -100px;
@@ -138,7 +138,6 @@
       }
       @keyframes matrix-fall { to { transform: translateY(120vh); } }
 
-      /* 4. FIRE */
       .fire-ember {
         position: absolute;
         bottom: -20px;
@@ -154,7 +153,6 @@
         100% { transform: translateY(-100vh) translateX(50px) scale(0); opacity: 0; }
       }
 
-      /* 5. MONEY */
       .money-item {
         position: absolute;
         top: -50px;
@@ -167,7 +165,6 @@
         100% { transform: translateY(110vh) rotate(360deg); }
       }
 
-      /* 6. SPACE */
       .star {
         position: absolute;
         width: 2px;
@@ -182,7 +179,6 @@
         100% { transform: translateZ(1000px) scale(20); opacity: 0; }
       }
 
-      /* 7. AURORA */
       .aurora-layer {
         position: absolute;
         width: 200%;
@@ -196,7 +192,6 @@
         to { transform: translateX(0%) skewY(-10deg); }
       }
 
-      /* 8. SNOW */
       .snow-particle {
         position: absolute;
         top: -10px;
@@ -209,7 +204,6 @@
         to { transform: translateY(105vh) translateX(20px); }
       }
 
-      /* 9. LIGHTNING */
       .lightning-flash {
         position: absolute;
         inset: 0;
@@ -226,7 +220,6 @@
         95%, 97% { opacity: 0.15; }
       }
 
-      /* 10. GLITCH */
       .glitch-line {
         position: absolute;
         width: 100%;
@@ -239,7 +232,6 @@
         to { top: 110%; }
       }
 
-      /* 11. CONFETTI */
       .confetti {
         position: absolute;
         width: 10px;
@@ -252,7 +244,6 @@
         100% { transform: translateY(110vh) rotate(720deg); }
       }
 
-      /* UTILS */
       .glass-card {
         background: rgba(10, 10, 10, 0.8);
         backdrop-filter: blur(25px);
@@ -264,6 +255,15 @@
         50% { transform: translateY(-10px); }
       }
       .animate-float { animation: float 5s infinite ease-in-out; }
+
+      /* Animação de entrada para os links */
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fade-in-up {
+        animation: fadeInUp 0.6s ease forwards;
+      }
     </style>
     <script type="importmap">
     {
