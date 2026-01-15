@@ -52,6 +52,7 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // ATUALIZA O ÍCONE DO APP / FAVICON DINAMICAMENTE
   useEffect(() => {
     if (brand.logoUrl) {
       const fav = document.getElementById('dynamic-favicon') as HTMLLinkElement;
@@ -133,7 +134,7 @@ const App: React.FC = () => {
   }, [links, pagesOrder, activeCategory]);
 
   const filteredLinks = useMemo(() => {
-    const targetCat = (activeCategory || (categories.length > 0 ? categories[0] : 'Página 1')).trim();
+    const targetCat = (activeCategory || categories[0] || 'Página 1').trim();
     return links.filter(l => (l.category as string || 'Página 1').trim() === targetCat);
   }, [links, activeCategory, categories]);
 
@@ -167,7 +168,7 @@ const App: React.FC = () => {
   };
 
   const BackgroundElements = () => {
-    const effect = brand.effect || 'none';
+    const effect = brand.effect || 'scanner';
     return (
       <div className="effect-container">
         <div className="fixed inset-0 bg-black -z-30" />
@@ -213,22 +214,14 @@ const App: React.FC = () => {
     );
   };
 
-  // Se estiver inicializando mas o brand já tiver os dados mínimos, podemos renderizar para evitar tela preta
-  if (initializing && !brand.name) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-yellow-500"></div>
-      </div>
-    );
-  }
-
+  if (initializing) return null;
   if (view === 'admin') return <AdminPanel />;
 
   if (view === 'login') {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-black relative overflow-hidden">
         <BackgroundElements />
-        <div className="w-full max-w-sm glass-card p-10 rounded-[3.5rem] text-center z-10 border border-white/10 shadow-2xl">
+        <div className="w-full max-sm glass-card p-10 rounded-[3.5rem] text-center z-10 border border-white/10 shadow-2xl">
           <h2 className="text-3xl font-black uppercase text-shimmer tracking-tighter italic mb-10">Admin Access</h2>
           <form onSubmit={handleLogin} className="space-y-5">
             <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white outline-none focus:border-yellow-500 transition-all" placeholder="E-mail" />
@@ -293,14 +286,12 @@ const App: React.FC = () => {
             </div>
           </nav>
         )}
-        <div className={`w-full space-y-6 mb-16 transition-all duration-300 min-h-[200px] ${isTransitioning ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
-          {filteredLinks.length > 0 ? filteredLinks.map((link, idx) => (
+        <div className={`w-full space-y-6 mb-16 transition-all duration-300 min-h-[400px] ${isTransitioning ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
+          {filteredLinks.map((link, idx) => (
             <div key={link.id} className="animate-fade-in-up" style={{ animationDelay: `${idx * 0.1}s` }}>
               <LinkButton link={link} />
             </div>
-          )) : (
-            <div className="text-center py-20 opacity-20 uppercase font-black text-xs tracking-widest">Nenhum link disponível</div>
-          )}
+          ))}
         </div>
         <footer className="w-full text-center space-y-12">
           <div className="flex justify-center gap-6">
