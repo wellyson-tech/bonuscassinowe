@@ -76,19 +76,21 @@
     </header>
 
     <div id="roleta-links" class="w-full max-w-lg space-y-4 relative z-10">
-        <div class="text-center py-20 opacity-20">
+        <!-- Loader inicial -->
+        <div id="main-loader" class="text-center py-20">
             <div class="w-8 h-8 border-2 border-purple-500/20 border-t-purple-500 rounded-full animate-spin mx-auto mb-4"></div>
-            <p class="text-[10px] font-black uppercase tracking-widest">Localizando Mesas...</p>
+            <p class="text-[10px] font-black uppercase tracking-widest opacity-40">Localizando Mesas...</p>
         </div>
     </div>
 
     <footer class="mt-16 text-center relative z-10">
-        <a href="/" class="text-[9px] font-black text-gray-600 hover:text-white uppercase tracking-[0.3em] flex items-center gap-2 transition-all">
+        <a href="../" class="text-[9px] font-black text-gray-600 hover:text-white uppercase tracking-[0.3em] flex items-center gap-2 transition-all">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
             Voltar para Início
         </a>
     </footer>
 
+    <!-- Scripts com carregamento garantido -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="script.js"></script>
 </body>

@@ -1,39 +1,68 @@
 
+// Configurações Supabase
 const supabaseUrl = 'https://ufqhxtfsoxzrofjpvhpk.supabase.co';
 const supabaseAnonKey = 'sb_publishable_pfMYcQnDWH_Gk8uK8ftIMw_suSco3Vt';
-const _supabase = supabase.createClient(supabaseUrl, supabaseAnonKey);
+
+let _supabase;
 
 async function init() {
-    await loadBrand();
-    await loadRoleta();
+    console.log("Iniciando página de roleta...");
+    
+    // 1. Verificar se o Supabase carregou do CDN
+    if (typeof supabase === 'undefined') {
+        console.error("Erro: Biblioteca Supabase não encontrada!");
+        document.getElementById('roleta-links').innerHTML = '<p class="text-red-500 text-center text-[10px] font-bold">ERRO: BIBLIOTECA NÃO CARREGADA</p>';
+        return;
+    }
+
+    // 2. Inicializar cliente
+    _supabase = supabase.createClient(supabaseUrl, supabaseAnonKey);
+    console.log("Supabase inicializado.");
+
+    // 3. Carregar dados
+    await Promise.all([
+        loadBrand(),
+        loadRoleta()
+    ]);
 }
 
 async function loadBrand() {
     try {
-        const { data } = await _supabase.from('brand_settings').select('*').eq('id', 1).single();
+        const { data, error } = await _supabase.from('brand_settings').select('*').eq('id', 1).single();
+        if (error) throw error;
+        
         if (data && data.logo_url) {
             document.getElementById('brand-logo').src = data.logo_url;
             document.getElementById('brand-logo-container').classList.remove('hidden');
         }
-    } catch (e) {}
+    } catch (e) {
+        console.warn("Aviso ao carregar marca:", e.message);
+    }
 }
 
 async function loadRoleta() {
     const container = document.getElementById('roleta-links');
     
     try {
+        console.log("Buscando links da categoria 'Roleta'...");
         const { data: links, error } = await _supabase
             .from('links')
             .select('*')
             .eq('category', 'Roleta')
             .order('position', { ascending: true });
 
-        if (error) throw error;
+        if (error) {
+            console.error("Erro na consulta do Supabase:", error);
+            throw error;
+        }
+
+        console.log("Links encontrados:", links?.length || 0);
 
         if (!links || links.length === 0) {
             container.innerHTML = `
                 <div class="glass p-10 rounded-[2rem] text-center border-dashed border-white/10">
-                    <p class="text-[10px] font-black text-gray-600 uppercase tracking-widest">Nenhuma mesa disponível agora</p>
+                    <p class="text-[10px] font-black text-gray-600 uppercase tracking-widest">Nenhuma mesa de Roleta disponível</p>
+                    <p class="text-[8px] text-gray-700 mt-2 uppercase">Certifique-se de que existem links com a categoria "Roleta" no painel.</p>
                 </div>
             `;
             return;
@@ -44,11 +73,14 @@ async function loadRoleta() {
             const card = document.createElement('a');
             card.href = link.url;
             card.target = '_blank';
-            card.className = 'glass roleta-item block p-5 rounded-[2.2rem] flex items-center gap-5 shadow-2xl';
+            card.className = 'glass roleta-item block p-5 rounded-[2.2rem] flex items-center gap-5 shadow-2xl mb-4 transition-all';
             
-            card.onclick = async (e) => {
-                // Registro rápido de clique
-                _supabase.from('links').update({ click_count: (link.click_count || 0) + 1 }).eq('id', link.id).then(() => {});
+            card.onclick = (e) => {
+                // Registro de clique em background
+                _supabase.from('links')
+                    .update({ click_count: (link.click_count || 0) + 1 })
+                    .eq('id', link.id)
+                    .then(() => console.log("Clique registrado"));
             };
 
             card.innerHTML = `
@@ -70,9 +102,15 @@ async function loadRoleta() {
         });
 
     } catch (e) {
-        console.error(e);
-        container.innerHTML = '<p class="text-center text-red-500 font-black uppercase text-[10px]">ERRO DE CONEXÃO MASTER</p>';
+        console.error("Erro fatal:", e);
+        container.innerHTML = `
+            <div class="glass p-10 rounded-[2rem] text-center border-red-500/20">
+                <p class="text-red-500 font-black uppercase text-[10px] tracking-widest">Erro de Conexão</p>
+                <p class="text-[8px] text-gray-600 mt-2 uppercase">Não foi possível conectar ao servidor master.</p>
+            </div>
+        `;
     }
 }
 
-window.onload = init;
+// Inicializa quando o DOM estiver pronto
+document.addEventListener('DOMContentLoaded', init);
