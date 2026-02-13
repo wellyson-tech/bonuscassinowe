@@ -1,286 +1,97 @@
 
 <!DOCTYPE html>
 <html lang="pt-br">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Content-Security-Policy" content="img-src 'self' https://icons.duckduckgo.com https://api.faviconkit.com https://*.supabase.co https://*.postimg.cc data:; upgrade-insecure-requests;">
-    
-    <!-- ÍCONES DO SITE / APP -->
-    <link rel="icon" id="dynamic-favicon" type="image/png" href="https://i.postimg.cc/fbp0thJQ/att.jpg" />
-    <link rel="apple-touch-icon" id="dynamic-apple-icon" href="https://i.postimg.cc/fbp0thJQ/att.jpg" />
-    
-    <title>Bônus CassinoWE</title>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SALA VIP - Roleta Estratégica</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet">
     <style>
-      body {
-        font-family: 'Plus Jakarta Sans', sans-serif;
-        background-color: #000000;
-        color: white;
-        margin: 0;
-        padding: 0;
-        overflow-x: hidden;
-      }
-
-      select option {
-        background-color: #0a0a0a !important;
-        color: white !important;
-      }
-      
-      select:focus {
-        background-color: #0a0a0a !important;
-      }
-
-      .gold-gradient {
-        background: linear-gradient(135deg, #fceabb 0%, #fccd4d 50%, #f8b500 51%, #fbdf93 100%) !important;
-        color: black !important;
-      }
-
-      .neon-purple-btn {
-        background: #1a1a1a;
-        border: 2px solid #a855f7;
-        box-shadow: 0 0 15px rgba(168, 85, 247, 0.3);
-      }
-
-      .neon-green-btn {
-        background: #1a1a1a;
-        border: 2px solid #10b981;
-        box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
-      }
-
-      .bg-main {
-        background: #000;
-        min-height: 100vh;
-        position: relative;
-      }
-
-      .ig-verified-wrapper {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        position: relative;
-        width: 24px;
-        height: 24px;
-        flex-shrink: 0;
-      }
-
-      .ig-verified-bg {
-        position: absolute;
-        inset: 0;
-        fill: #0095f6;
-      }
-
-      .ig-verified-check {
-        position: relative;
-        z-index: 1;
-        width: 12px;
-        height: 12px;
-        fill: white;
-      }
-
-      .text-shimmer {
-        background: linear-gradient(to right, #d4af37 20%, #fff4d6 40%, #fff4d6 60%, #d4af37 80%);
-        background-size: 200% auto;
-        color: transparent;
-        -webkit-background-clip: text;
-        background-clip: text;
-        animation: shine 3s linear infinite;
-      }
-
-      @keyframes shine {
-        to { background-position: 200% center; }
-      }
-
-      /* EFEITOS DE FUNDO */
-      .effect-container {
-        position: fixed;
-        inset: 0;
-        pointer-events: none;
-        z-index: 0;
-        overflow: hidden;
-      }
-
-      /* 1. SCANNER */
-      .scanner-beam {
-        position: absolute;
-        top: 0; left: -150%; width: 120%; height: 100%;
-        background: linear-gradient(110deg, transparent, rgba(212, 175, 55, 0.05) 50%, transparent);
-        animation: scan 8s infinite ease-in-out;
-      }
-      @keyframes scan {
-        0% { transform: translateX(-100%) skewX(-15deg); }
-        100% { transform: translateX(200%) skewX(-15deg); }
-      }
-
-      /* 2. CHUVA DE OURO */
-      .gold-particle {
-        position: absolute;
-        width: 2px;
-        height: 20px;
-        background: linear-gradient(to bottom, transparent, #d4af37);
-        opacity: 0.3;
-        animation: fall linear infinite;
-      }
-      @keyframes fall { to { transform: translateY(110vh); } }
-
-      /* 3. MATRIX */
-      .matrix-column {
-        position: absolute;
-        top: -100px;
-        color: #0f0;
-        font-family: monospace;
-        font-size: 14px;
-        writing-mode: vertical-rl;
-        text-orientation: upright;
-        opacity: 0.2;
-        animation: matrix-fall linear infinite;
-      }
-      @keyframes matrix-fall { to { transform: translateY(120vh); } }
-
-      /* 4. FIRE */
-      .fire-ember {
-        position: absolute;
-        bottom: -20px;
-        width: 4px;
-        height: 4px;
-        background: #ff4d00;
-        border-radius: 50%;
-        filter: blur(2px);
-        animation: ember-rise ease-out infinite;
-      }
-      @keyframes ember-rise {
-        0% { transform: translateY(0) translateX(0) scale(1); opacity: 1; }
-        100% { transform: translateY(-100vh) translateX(50px) scale(0); opacity: 0; }
-      }
-
-      /* 5. MONEY */
-      .money-item {
-        position: absolute;
-        top: -50px;
-        font-size: 24px;
-        opacity: 0.4;
-        animation: money-fall ease-in infinite;
-      }
-      @keyframes money-fall {
-        0% { transform: translateY(0) rotate(0deg); }
-        100% { transform: translateY(110vh) rotate(360deg); }
-      }
-
-      /* 6. SPACE */
-      .star {
-        position: absolute;
-        width: 2px;
-        height: 2px;
-        background: white;
-        border-radius: 50%;
-        animation: star-warp linear infinite;
-      }
-      @keyframes star-warp {
-        0% { transform: translateZ(0) scale(0); opacity: 0; }
-        50% { opacity: 1; }
-        100% { transform: translateZ(1000px) scale(20); opacity: 0; }
-      }
-
-      /* 7. AURORA */
-      .aurora-layer {
-        position: absolute;
-        width: 200%;
-        height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(0, 255, 150, 0.1), rgba(168, 85, 247, 0.1), transparent);
-        filter: blur(80px);
-        animation: aurora-wave 20s infinite alternate ease-in-out;
-      }
-      @keyframes aurora-wave {
-        from { transform: translateX(-20%) skewY(10deg); }
-        to { transform: translateX(0%) skewY(-10deg); }
-      }
-
-      /* 8. SNOW */
-      .snow-particle {
-        position: absolute;
-        top: -10px;
-        background: white;
-        border-radius: 50%;
-        opacity: 0.6;
-        animation: snow-fall linear infinite;
-      }
-      @keyframes snow-fall {
-        to { transform: translateY(105vh) translateX(20px); }
-      }
-
-      /* 9. LIGHTNING */
-      .lightning-flash {
-        position: absolute;
-        inset: 0;
-        background: white;
-        opacity: 0;
-        z-index: 1;
-        pointer-events: none;
-      }
-      .animate-lightning {
-        animation: lightning-strike 5s infinite;
-      }
-      @keyframes lightning-strike {
-        0%, 94%, 96%, 100% { opacity: 0; }
-        95%, 97% { opacity: 0.15; }
-      }
-
-      /* 10. GLITCH */
-      .glitch-line {
-        position: absolute;
-        width: 100%;
-        height: 1px;
-        background: rgba(255, 255, 255, 0.1);
-        animation: glitch-move 2s infinite linear;
-      }
-      @keyframes glitch-move {
-        from { top: -10%; }
-        to { top: 110%; }
-      }
-
-      /* 11. CONFETTI */
-      .confetti {
-        position: absolute;
-        width: 10px;
-        height: 10px;
-        opacity: 0.8;
-        animation: confetti-fall linear infinite;
-      }
-      @keyframes confetti-fall {
-        0% { transform: translateY(-20px) rotate(0deg); }
-        100% { transform: translateY(110vh) rotate(720deg); }
-      }
-
-      /* UTILS */
-      .glass-card {
-        background: rgba(10, 10, 10, 0.8);
-        backdrop-filter: blur(25px);
-        border: 1px solid rgba(255, 255, 255, 0.05);
-      }
-
-      @keyframes float {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-10px); }
-      }
-      .animate-float { animation: float 5s infinite ease-in-out; }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: #000;
+            color: white;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        .glass {
+            background: rgba(15, 15, 15, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .roleta-item {
+            border-bottom: 5px solid #a855f7;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .roleta-item:hover {
+            transform: scale(1.02) translateY(-4px);
+            border-color: #d8b4fe;
+            background: rgba(168, 85, 247, 0.1);
+        }
+        @keyframes scan {
+            from { top: -10%; }
+            to { top: 110%; }
+        }
+        .scanner {
+            position: fixed;
+            left: 0; width: 100%; height: 5px;
+            background: linear-gradient(to right, transparent, #a855f7, transparent);
+            box-shadow: 0 0 15px #a855f7;
+            animation: scan 4s infinite linear;
+            z-index: 0;
+            opacity: 0.3;
+        }
+        .text-shimmer {
+            background: linear-gradient(to right, #a855f7 20%, #fff 40%, #fff 60%, #a855f7 80%);
+            background-size: 200% auto;
+            color: transparent;
+            -webkit-background-clip: text;
+            background-clip: text;
+            animation: shine 3s linear infinite;
+        }
+        @keyframes shine { to { background-position: 200% center; } }
+        .logo-ring {
+            padding: 3px;
+            background: linear-gradient(135deg, #a855f7, #6366f1);
+            border-radius: 50%;
+        }
     </style>
-    <script type="importmap">
-    {
-      "imports": {
-        "react": "https://esm.sh/react@19.0.0",
-        "react/": "https://esm.sh/react@19.0.0/",
-        "react-dom": "https://esm.sh/react-dom@19.0.0",
-        "react-dom/": "https://esm.sh/react-dom@19.0.0/",
-        "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.7"
-      }
-    }
-    </script>
-  <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-main">
-    <div id="root"></div>
-    <script type="module" src="index.tsx"></script>
-  <script type="module" src="/index.tsx"></script>
+<body class="min-h-screen flex flex-col items-center py-12 px-6">
+    <div class="scanner"></div>
+    <div class="fixed inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-900/10 via-black to-black -z-10"></div>
+
+    <header class="text-center mb-12 relative z-10 flex flex-col items-center">
+        <div id="brand-logo-container" class="mb-6 hidden">
+            <div class="logo-ring shadow-2xl">
+                <img id="brand-logo" src="" class="w-24 h-24 rounded-full object-cover border-4 border-black" alt="Logo">
+            </div>
+        </div>
+        <div class="inline-block px-4 py-1 rounded-full border border-purple-500/30 bg-purple-500/10 text-purple-400 text-[9px] font-black uppercase tracking-[0.4em] mb-4">
+            Acesso Restrito VIP
+        </div>
+        <h1 class="text-5xl font-black uppercase italic tracking-tighter text-shimmer leading-none mb-2">SALA VIP</h1>
+        <h2 class="text-xl font-black uppercase italic tracking-tighter text-white opacity-70">ROLETA ESTRATÉGICA</h2>
+    </header>
+
+    <div id="roleta-links" class="w-full max-w-lg space-y-4 relative z-10">
+        <!-- Loader inicial -->
+        <div id="main-loader" class="text-center py-20">
+            <div class="w-8 h-8 border-2 border-purple-500/20 border-t-purple-500 rounded-full animate-spin mx-auto mb-4"></div>
+            <p class="text-[10px] font-black uppercase tracking-widest opacity-40">Localizando Mesas...</p>
+        </div>
+    </div>
+
+    <footer class="mt-16 text-center relative z-10">
+        <a href="../" class="text-[9px] font-black text-gray-600 hover:text-white uppercase tracking-[0.3em] flex items-center gap-2 transition-all">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            Voltar para Início
+        </a>
+    </footer>
+
+    <!-- Scripts com carregamento garantido -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="script.js"></script>
 </body>
 </html>
