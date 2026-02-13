@@ -7,7 +7,7 @@ import AdminPanel from './components/AdminPanel';
 import { CasinoLink, CasinoBrand, SocialLink } from './types';
 
 const App: React.FC = () => {
-  const [view, setView] = useState<'public' | 'login' | 'admin' | 'roleta'>('public');
+  const [view, setView] = useState<'public' | 'login' | 'admin'>('public');
   const [links, setLinks] = useState<CasinoLink[]>([]);
   const [socials, setSocials] = useState<SocialLink[]>([]);
   const [brand, setBrand] = useState<CasinoBrand>(DEFAULT_BRAND);
@@ -25,12 +25,9 @@ const App: React.FC = () => {
     const handleNavigation = async () => {
       const hash = window.location.hash;
       const { data: { session } } = await supabase.auth.getSession();
-      
       if (hash === '#/admin-secret') {
         if (session && session.user.id === ADMIN_UID) setView('admin');
         else setView('login');
-      } else if (hash === '#/roleta') {
-        setView('roleta');
       } else {
         setView('public');
       }
@@ -55,23 +52,54 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // ATUALIZA O ÍCONE DO APP / FAVICON DINAMICAMENTE
+  useEffect(() => {
+    if (brand.logoUrl) {
+      const fav = document.getElementById('dynamic-favicon') as HTMLLinkElement;
+      const apple = document.getElementById('dynamic-apple-icon') as HTMLLinkElement;
+      if (fav) fav.href = brand.logoUrl;
+      if (apple) apple.href = brand.logoUrl;
+      document.title = brand.name;
+    }
+  }, [brand]);
+
   const fetchBrand = async () => {
     try {
       const { data, error } = await supabase.from('brand_settings').select('*').eq('id', 1).single();
       if (data && !error) {
         setBrand({
-          name: data.name, tagline: data.tagline, logoUrl: data.logo_url,
-          backgroundUrl: data.background_url, verified: data.verified,
-          footerText: data.footer_text, effect: data.effect || 'scanner'
+          name: data.name,
+          tagline: data.tagline,
+          logoUrl: data.logo_url,
+          backgroundUrl: data.background_url,
+          verified: data.verified,
+          footerText: data.footer_text,
+          effect: data.effect || 'scanner'
         });
+        
+        if (data.footer_text && data.footer_text.includes('ORDER:')) {
+            try {
+                const orderPart = data.footer_text.split('ORDER:')[1];
+                const parsedOrder = JSON.parse(orderPart);
+                if (Array.isArray(parsedOrder) && parsedOrder.length > 0) {
+                  setPagesOrder(parsedOrder);
+                }
+            } catch(e) {}
+        }
       }
     } catch (e) {}
   };
 
   const fetchLinks = async () => {
     try {
-      const { data } = await supabase.from('links').select('*').order('position', { ascending: true });
-      if (data) setLinks(data);
+      const { data, error } = await supabase
+        .from('links')
+        .select('*')
+        .order('position', { ascending: true });
+      
+      if (!error && data) {
+        setLinks(data);
+      }
     } catch (e) {}
   };
 
@@ -83,21 +111,61 @@ const App: React.FC = () => {
   };
 
   const categories = useMemo(() => {
-    const foundCats = Array.from(new Set(links.map(l => (l.category as string || 'Página 1').trim())));
-    const filtered = foundCats.filter(c => c.toLowerCase() !== 'roleta');
-    if (filtered.length > 0 && (!activeCategory || !filtered.includes(activeCategory))) {
-        setActiveCategory(filtered[0]);
+    const foundCats: string[] = [];
+    links.forEach(l => {
+      const name = (l.category as string || 'Página 1').trim();
+      if (!foundCats.includes(name)) foundCats.push(name);
+    });
+
+    if (foundCats.length === 0 && pagesOrder.length === 0) return ['Página 1'];
+
+    const ordered = pagesOrder.filter(c => foundCats.includes(c));
+    foundCats.forEach(c => {
+        if (!ordered.includes(c)) ordered.push(c);
+    });
+
+    const finalCats = ordered.length > 0 ? ordered : foundCats;
+    
+    if (finalCats.length > 0 && (!activeCategory || !finalCats.includes(activeCategory))) {
+        setActiveCategory(finalCats[0]);
     }
-    return filtered;
-  }, [links, activeCategory]);
+    
+    return finalCats;
+  }, [links, pagesOrder, activeCategory]);
 
   const filteredLinks = useMemo(() => {
-    if (view === 'roleta') {
-      return links.filter(l => (l.category as string || '').toLowerCase() === 'roleta');
-    }
     const targetCat = (activeCategory || categories[0] || 'Página 1').trim();
     return links.filter(l => (l.category as string || 'Página 1').trim() === targetCat);
-  }, [links, activeCategory, categories, view]);
+  }, [links, activeCategory, categories]);
+
+  const changeCategory = (cat: string) => {
+    const cleanCat = cat.trim();
+    if (cleanCat === activeCategory.trim()) return;
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setActiveCategory(cleanCat);
+      setIsTransitioning(false);
+    }, 300);
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginLoading(true);
+    setLoginError(null);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      if (data.user?.id === ADMIN_UID) setView('admin');
+      else {
+        await supabase.auth.signOut();
+        setLoginError('Acesso negado.');
+      }
+    } catch (err: any) {
+      setLoginError('Credenciais inválidas');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
 
   const BackgroundElements = () => {
     const effect = brand.effect || 'scanner';
@@ -105,10 +173,43 @@ const App: React.FC = () => {
       <div className="effect-container">
         <div className="fixed inset-0 bg-black -z-30" />
         {brand.backgroundUrl && (
-          <div className="fixed inset-0 -z-20 bg-cover bg-center opacity-40" style={{ backgroundImage: `url(${brand.backgroundUrl})` }} />
+          <div 
+            className="fixed inset-0 -z-20 bg-cover bg-center bg-no-repeat opacity-40 transition-opacity duration-1000"
+            style={{ backgroundImage: `url(${brand.backgroundUrl})`, backgroundAttachment: 'fixed' }}
+          />
         )}
         {effect === 'scanner' && <div className="scanner-beam" />}
-        {effect === 'gold-rain' && Array.from({ length: 40 }).map((_, i) => <div key={i} className="gold-particle" style={{ left: `${Math.random() * 100}%`, animationDuration: `${2+Math.random()*3}s` }} />)}
+        {effect === 'gold-rain' && Array.from({ length: 40 }).map((_, i) => (
+          <div key={i} className="gold-particle" style={{ left: `${Math.random() * 100}%`, animationDuration: `${2 + Math.random() * 3}s`, animationDelay: `${Math.random() * 5}s` }} />
+        ))}
+        {effect === 'matrix' && Array.from({ length: 30 }).map((_, i) => (
+          <div key={i} className="matrix-column" style={{ left: `${(i * 3.3)}%`, animationDuration: `${3 + Math.random() * 5}s`, animationDelay: `${Math.random() * 5}s` }}>
+            {Array.from({ length: 20 }).map(() => String.fromCharCode(0x30A0 + Math.random() * 96)).join('')}
+          </div>
+        ))}
+        {effect === 'fire' && Array.from({ length: 50 }).map((_, i) => (
+          <div key={i} className="fire-ember" style={{ left: `${Math.random() * 100}%`, animationDuration: `${3 + Math.random() * 4}s`, animationDelay: `${Math.random() * 5}s`, width: `${2 + Math.random() * 4}px` }} />
+        ))}
+        {effect === 'money' && Array.from({ length: 20 }).map((_, i) => (
+          <div key={i} className="money-item" style={{ left: `${Math.random() * 100}%`, animationDuration: `${4 + Math.random() * 6}s`, animationDelay: `${Math.random() * 8}s` }}>
+            {['💵', '💰', '🎰', '💎', '🪙'][Math.floor(Math.random() * 5)]}
+          </div>
+        ))}
+        {effect === 'space' && Array.from({ length: 100 }).map((_, i) => (
+          <div key={i} className="star" style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%`, animationDuration: `${1 + Math.random() * 3}s`, animationDelay: `${Math.random() * 5}s` }} />
+        ))}
+        {effect === 'aurora' && <><div className="aurora-layer" style={{ top: '10%' }} /><div className="aurora-layer" style={{ top: '30%', animationDelay: '-10s', opacity: 0.5 }} /></>}
+        {effect === 'confetti' && Array.from({ length: 50 }).map((_, i) => (
+          <div key={i} className="confetti" style={{ left: `${Math.random() * 100}%`, backgroundColor: `hsl(${Math.random() * 360}, 70%, 60%)`, animationDuration: `${3 + Math.random() * 4}s`, animationDelay: `${Math.random() * 5}s` }} />
+        ))}
+        {effect === 'snow' && Array.from({ length: 60 }).map((_, i) => (
+          <div key={i} className="snow-particle" style={{ left: `${Math.random() * 100}%`, width: `${2 + Math.random() * 4}px`, height: `${2 + Math.random() * 4}px`, animationDuration: `${5 + Math.random() * 10}s`, animationDelay: `${Math.random() * 10}s` }} />
+        ))}
+        {effect === 'lightning' && <div className="lightning-flash animate-lightning" />}
+        {effect === 'glitch' && Array.from({ length: 10 }).map((_, i) => (
+          <div key={i} className="glitch-line" style={{ animationDelay: `${Math.random() * 2}s`, opacity: Math.random() * 0.3 }} />
+        ))}
+        <div className="fixed inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/90 -z-15 pointer-events-none" />
       </div>
     );
   };
@@ -116,47 +217,23 @@ const App: React.FC = () => {
   if (initializing) return null;
   if (view === 'admin') return <AdminPanel />;
 
-  // PÁGINA EXCLUSIVA DA ROLETA (#/roleta) - 100% INDEPENDENTE
-  if (view === 'roleta') {
+  if (view === 'login') {
     return (
-      <div className="min-h-screen bg-black text-white font-sans relative flex flex-col items-center overflow-x-hidden">
-        <div className="fixed inset-0 bg-black -z-20" />
-        <div className="fixed top-0 inset-x-0 h-[80vh] bg-gradient-to-b from-purple-900/10 via-black to-black -z-10 pointer-events-none" />
-        
-        <main className="relative z-10 w-full max-w-lg px-6 py-20 flex flex-col items-center">
-          <header className="text-center mb-16 animate-fade-in">
-            <div className="mb-4 flex justify-center">
-               <span className="px-4 py-1.5 rounded-full border border-purple-500/30 bg-purple-500/10 text-purple-500 text-[9px] font-black uppercase tracking-[0.4em]">Acesso VIP Liberado</span>
-            </div>
-            <h1 className="text-5xl font-black uppercase tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-purple-400 italic mb-4">
-              SALA ROLETA
-            </h1>
-            <p className="text-[10px] text-gray-500 uppercase font-bold tracking-[0.2em]">Estratégias e Multiplicadores Exclusivos</p>
-          </header>
-
-          <div className="w-full space-y-5">
-            {filteredLinks.map((link, idx) => (
-              <div key={link.id} className="animate-fade-in-up" style={{ animationDelay: `${idx * 0.1}s` }}>
-                <LinkButton link={link} />
-              </div>
-            ))}
-            {filteredLinks.length === 0 && (
-               <div className="py-20 text-center opacity-20 text-[10px] uppercase font-black">Nenhuma sala ativa</div>
-            )}
-          </div>
-
-          <footer className="mt-24 opacity-30">
-             <div className="flex flex-col items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                <p className="text-[8px] font-black uppercase tracking-[0.5em]">Servidores Seguros</p>
-             </div>
-          </footer>
-        </main>
+      <div className="min-h-screen flex items-center justify-center p-6 bg-black relative overflow-hidden">
+        <BackgroundElements />
+        <div className="w-full max-sm glass-card p-10 rounded-[3.5rem] text-center z-10 border border-white/10 shadow-2xl">
+          <h2 className="text-3xl font-black uppercase text-shimmer tracking-tighter italic mb-10">Admin Access</h2>
+          <form onSubmit={handleLogin} className="space-y-5">
+            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white outline-none focus:border-yellow-500 transition-all" placeholder="E-mail" />
+            <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white outline-none focus:border-yellow-500 font-mono transition-all" placeholder="Senha" />
+            {loginError && <p className="text-[10px] text-red-500 uppercase font-black text-center">{loginError}</p>}
+            <button type="submit" disabled={loginLoading} className="w-full py-5 bg-yellow-500 text-black font-black rounded-2xl uppercase text-[11px] tracking-widest hover:bg-yellow-400 active:scale-95 transition-all">{loginLoading ? 'Verificando...' : 'Acessar Painel Master'}</button>
+          </form>
+        </div>
       </div>
     );
   }
 
-  // PÁGINA PRINCIPAL (DEFAULT)
   return (
     <div className="min-h-screen bg-black text-white relative font-sans overflow-x-hidden pb-20">
       <BackgroundElements />
@@ -169,38 +246,64 @@ const App: React.FC = () => {
             </div>
           </div>
           <div className="flex flex-col items-center">
-            <h1 className="text-4xl font-black uppercase tracking-tighter text-shimmer italic leading-tight">{brand.name}</h1>
-            <p className="text-[12px] font-bold text-white uppercase tracking-[0.3em] mt-5 px-4 text-center max-w-[320px] opacity-70 border-t border-white/10 pt-4">{brand.tagline}</p>
+            <div className="flex items-center justify-center gap-3">
+              <h1 className="text-4xl font-black uppercase tracking-tighter text-shimmer italic leading-tight">{brand.name}</h1>
+              {brand.verified && (
+                <div className="ig-verified-wrapper">
+                  <svg viewBox="0 0 24 24" className="ig-verified-bg"><path d="M12 2L14.4 4.8L17.7 4.2L18.7 7.5L21.8 8.8L21 12L21.8 15.2L18.7 16.5L17.7 19.8L14.4 19.2L12 22L9.6 19.2L6.3 19.8L5.3 16.5L2.2 15.2L3 12L2.2 8.8L5.3 7.5L6.3 4.2L9.6 4.8L12 2Z" /></svg>
+                  <svg viewBox="0 0 24 24" className="ig-verified-check"><path d="M10 15.172l9.192-9.193 1.415 1.414L10 18l-6.364-6.364 1.414-1.414z" /></svg>
+                </div>
+              )}
+            </div>
+            <p className="text-[12px] font-bold text-white uppercase tracking-[0.3em] mt-5 px-4 text-center max-w-[320px] drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] border-t border-white/10 pt-4">
+              {brand.tagline}
+            </p>
           </div>
         </header>
         
         {categories.length > 1 && (
           <nav className="w-full mb-12 sticky top-4 z-50 px-2">
-            <div className="glass-card p-2 rounded-[2.5rem] flex items-center justify-between border border-white/5 relative">
+            <div className="glass-card p-2 rounded-[2.5rem] flex items-center justify-between border border-white/5 shadow-2xl overflow-hidden relative">
               <div 
                 className="absolute h-[calc(100%-16px)] bg-yellow-500 rounded-[2rem] transition-all duration-500 z-0"
-                style={{ width: `${100 / categories.length}%`, left: `${(categories.indexOf(activeCategory) * (100 / categories.length))}%`, margin: '0 8px' }}
+                style={{
+                  width: `${100 / categories.length}%`,
+                  left: `${(categories.indexOf(activeCategory.trim()) * (100 / categories.length))}%`,
+                  margin: '0 8px'
+                }}
               />
               {categories.map((cat) => (
-                <button key={cat} onClick={() => setActiveCategory(cat)} className={`relative z-10 flex-1 py-4 text-[10px] font-black uppercase tracking-widest transition-colors ${activeCategory === cat ? 'text-black' : 'text-gray-500'}`}>{cat}</button>
+                <button
+                  key={cat}
+                  onClick={() => changeCategory(cat)}
+                  className={`relative z-10 flex-1 py-4 text-[10px] font-black uppercase tracking-widest transition-colors duration-500 ${
+                    activeCategory.trim() === cat.trim() ? 'text-black' : 'text-gray-500 hover:text-white'
+                  }`}
+                >
+                  {cat}
+                </button>
               ))}
             </div>
           </nav>
         )}
-
-        <div className="w-full space-y-6 mb-16">
-          {filteredLinks.map((link) => <LinkButton key={link.id} link={link} />)}
+        <div className={`w-full space-y-6 mb-16 transition-all duration-300 min-h-[400px] ${isTransitioning ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
+          {filteredLinks.map((link, idx) => (
+            <div key={link.id} className="animate-fade-in-up" style={{ animationDelay: `${idx * 0.1}s` }}>
+              <LinkButton link={link} />
+            </div>
+          ))}
         </div>
-
         <footer className="w-full text-center space-y-12">
           <div className="flex justify-center gap-6">
             {socials.map((social) => (
-              <a key={social.id} href={social.url} target="_blank" className="w-16 h-16 flex items-center justify-center rounded-[2rem] bg-white/5 border border-white/10 text-white transition-all hover:-translate-y-2">
+              <a key={social.id} href={social.url} target="_blank" rel="noopener noreferrer" className="w-16 h-16 flex items-center justify-center rounded-[2rem] bg-white/5 border border-white/10 hover:border-yellow-500/50 text-white transition-all hover:-translate-y-2">
                 <div className="w-7 h-7">{Icons[social.icon] || social.name.charAt(0)}</div>
               </a>
             ))}
           </div>
-          <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.4em]">{brand.footerText || `${brand.name} © 2025`}</p>
+          <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.4em]">
+            {brand.footerText?.split('ORDER:')[0] || `${brand.name} © 2025`}
+          </p>
         </footer>
       </main>
     </div>
