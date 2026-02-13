@@ -45,11 +45,11 @@ const AdminPanel: React.FC = () => {
         });
         
         if (data.footer_text && data.footer_text.includes('ORDER:')) {
-            try {
-                const orderPart = data.footer_text.split('ORDER:')[1];
-                const parsed = JSON.parse(orderPart);
-                if (Array.isArray(parsed)) setPagesOrder(parsed);
-            } catch(e) {}
+          try {
+            const orderPart = data.footer_text.split('ORDER:')[1];
+            const parsed = JSON.parse(orderPart);
+            if (Array.isArray(parsed)) setPagesOrder(parsed);
+          } catch(e) {}
         }
       }
     } catch (e) {}
@@ -67,43 +67,23 @@ const AdminPanel: React.FC = () => {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'bg') => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (file.size > 1.5 * 1024 * 1024) {
-      alert("Arquivo muito grande! Escolha uma imagem de até 1.5MB.");
-      return;
-    }
-
+    if (file.size > 1.5 * 1024 * 1024) { alert("Arquivo muito grande (Máx 1.5MB)"); return; }
     setLoading(true);
     try {
       const base64 = await convertFileToBase64(file);
-      if (type === 'logo') {
-        setBrand(prev => ({ ...prev, logoUrl: base64 }));
-      } else {
-        setBrand(prev => ({ ...prev, backgroundUrl: base64 }));
-      }
-      alert("Imagem processada com sucesso! Clique em 'Salvar Identidade' para aplicar.");
-    } catch (error) {
-      alert('Erro ao processar imagem.');
-    } finally {
-      setLoading(false);
-    }
+      if (type === 'logo') setBrand(prev => ({ ...prev, logoUrl: base64 }));
+      else setBrand(prev => ({ ...prev, backgroundUrl: base64 }));
+    } catch (error) { alert('Erro ao processar imagem'); } finally { setLoading(false); }
   };
 
-  const fetchLinks = async (targetPageToSet?: string) => {
-    try {
-      const { data } = await supabase.from('links').select('*').order('position', { ascending: true });
-      if (data) {
-        const typedData = data as CasinoLink[];
-        setLinks(typedData);
-        const foundCategories = Array.from(new Set(typedData.map(l => (String(l.category || 'Página 1')).trim())));
-        if (targetPageToSet) {
-          setActiveAdminPage(targetPageToSet);
-        } else if (!activeAdminPage) {
-          const firstValid = pagesOrder.find(p => foundCategories.includes(p)) || foundCategories[0] || 'Página 1';
-          setActiveAdminPage(String(firstValid));
-        }
-      }
-    } catch (e) {}
+  const fetchLinks = async (targetPage?: string) => {
+    const { data } = await supabase.from('links').select('*').order('position', { ascending: true });
+    if (data) {
+      setLinks(data as CasinoLink[]);
+      const found = Array.from(new Set((data as CasinoLink[]).map(l => (l.category || 'Página 1').trim())));
+      if (targetPage) setActiveAdminPage(targetPage);
+      else if (!activeAdminPage) setActiveAdminPage(pagesOrder.find(p => found.includes(p)) || found[0] || 'Página 1');
+    }
   };
 
   const fetchSocials = async () => {
@@ -111,283 +91,145 @@ const AdminPanel: React.FC = () => {
     if (data) setSocials(data);
   };
 
-  const moveCategory = async (categoryName: string, direction: 'left' | 'right') => {
-    const currentOrder = [...sortedCategories];
-    const idx = currentOrder.indexOf(categoryName.trim());
+  const moveCategory = async (name: string, dir: 'left' | 'right') => {
+    const order = [...sortedCategories];
+    const idx = order.indexOf(name.trim());
     if (idx === -1) return;
-    const targetIdx = direction === 'left' ? idx - 1 : idx + 1;
-    if (targetIdx < 0 || targetIdx >= currentOrder.length) return;
-    const newOrder = [...currentOrder];
-    [newOrder[idx], newOrder[targetIdx]] = [newOrder[targetIdx], newOrder[idx]];
-    setPagesOrder(newOrder);
-    try {
-        const { data: brandData } = await supabase.from('brand_settings').select('footer_text').eq('id', 1).single();
-        const baseText = brandData?.footer_text?.split('ORDER:')[0] || '';
-        await supabase.from('brand_settings').update({ 
-            footer_text: `${baseText}ORDER:${JSON.stringify(newOrder)}` 
-        }).eq('id', 1);
-    } catch(e) {}
+    const target = dir === 'left' ? idx - 1 : idx + 1;
+    if (target < 0 || target >= order.length) return;
+    [order[idx], order[target]] = [order[target], order[idx]];
+    setPagesOrder(order);
+    const { data } = await supabase.from('brand_settings').select('footer_text').eq('id', 1).single();
+    const base = data?.footer_text?.split('ORDER:')[0] || '';
+    await supabase.from('brand_settings').update({ footer_text: `${base}ORDER:${JSON.stringify(order)}` }).eq('id', 1);
   };
 
-  const jumpToPosition = async (linkId: string, newPos: number) => {
-    const pageLinks = [...links]
-      .filter(l => (l.category || 'Página 1').trim() === activeAdminPage.trim())
-      .sort((a, b) => a.position - b.position);
-    const currentIdx = pageLinks.findIndex(l => l.id === linkId);
-    if (currentIdx === -1) return;
-    const targetIdx = Math.max(0, Math.min(newPos - 1, pageLinks.length - 1));
-    if (targetIdx === currentIdx) return;
+  const jumpToPosition = async (id: string, n: number) => {
+    const page = links.filter(l => (l.category || 'Página 1').trim() === activeAdminPage.trim()).sort((a,b) => a.position - b.position);
+    const curr = page.findIndex(l => l.id === id);
+    if (curr === -1) return;
     setLoading(true);
-    const movedItem = pageLinks.splice(currentIdx, 1)[0];
-    pageLinks.splice(targetIdx, 0, movedItem);
-    const updates = pageLinks.map((link, index) => ({ id: link.id, position: index + 1 }));
-    try {
-      await supabase.from('links').upsert(updates);
-      await fetchLinks();
-    } catch (err) { alert("Erro ao reordenar"); } finally { setLoading(false); }
+    const item = page.splice(curr, 1)[0];
+    page.splice(Math.max(0, Math.min(n-1, page.length)), 0, item);
+    const upserts = page.map((l, i) => ({ id: l.id, position: i + 1 }));
+    await supabase.from('links').upsert(upserts);
+    await fetchLinks();
+    setLoading(false);
   };
 
   const handleSaveBrand = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    try {
-      const baseText = brand.footerText?.split('ORDER:')[0] || '';
-      const finalFooter = pagesOrder.length > 0 ? `${baseText}ORDER:${JSON.stringify(pagesOrder)}` : baseText;
-      const { error } = await supabase.from('brand_settings').update({
-        name: brand.name,
-        tagline: brand.tagline,
-        logo_url: brand.logoUrl,
-        background_url: brand.backgroundUrl,
-        verified: brand.verified,
-        footer_text: finalFooter,
-        effect: brand.effect
-      }).eq('id', 1);
-      if (error) throw error;
-      alert("Identidade visual atualizada!");
-    } catch (err) { alert("Erro ao salvar marca."); } finally { setLoading(false); }
+    const base = brand.footerText?.split('ORDER:')[0] || '';
+    const finalFooter = pagesOrder.length > 0 ? `${base}ORDER:${JSON.stringify(pagesOrder)}` : base;
+    await supabase.from('brand_settings').update({
+      name: brand.name, tagline: brand.tagline, logo_url: brand.logoUrl,
+      background_url: brand.backgroundUrl, verified: brand.verified,
+      footer_text: finalFooter, effect: brand.effect
+    }).eq('id', 1);
+    alert("Marca salva!");
+    setLoading(false);
   };
 
   const handleSaveLink = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingLink) return;
     setLoading(true);
-    try {
-      const targetCategory = (editingLink.category || activeAdminPage || 'Página 1').trim();
-      const payload = {
-        title: editingLink.title,
-        description: editingLink.description || 'SINAIS EM TEMPO REAL',
-        url: editingLink.url,
-        type: editingLink.type || 'glass',
-        icon: editingLink.icon || 'auto',
-        badge: editingLink.badge || '',
-        category: targetCategory,
-        position: editingLink.id ? editingLink.position : links.length + 1,
-        is_highlighted: editingLink.is_highlighted ?? false
-      };
-      if (editingLink.id) {
-        await supabase.from('links').update(payload).eq('id', editingLink.id);
-      } else {
-        await supabase.from('links').insert([payload]);
-      }
-      setEditingLink(null);
-      await fetchLinks(targetCategory);
-    } catch (err) { alert("Erro ao salvar link"); } finally { setLoading(false); }
+    const cat = (editingLink.category || activeAdminPage || 'Página 1').trim();
+    const payload = { ...editingLink, category: cat, position: editingLink.id ? editingLink.position : links.length + 1 };
+    delete (payload as any).created_at; delete (payload as any).click_count;
+    if (editingLink.id) await supabase.from('links').update(payload).eq('id', editingLink.id);
+    else await supabase.from('links').insert([payload]);
+    setEditingLink(null);
+    await fetchLinks(cat);
+    setLoading(false);
   };
 
-  const handleSaveSocial = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingSocial) return;
-    setLoading(true);
-    try {
-      const payload = {
-        name: editingSocial.name,
-        url: editingSocial.url,
-        icon: editingSocial.icon || 'instagram',
-        position: editingSocial.id ? editingSocial.position : socials.length + 1
-      };
-      if (editingSocial.id) {
-        await supabase.from('social_links').update(payload).eq('id', editingSocial.id);
-      } else {
-        await supabase.from('social_links').insert([payload]);
-      }
-      setEditingSocial(null);
-      await fetchSocials();
-    } catch (err) { alert("Erro ao salvar rede social"); } finally { setLoading(false); }
-  };
-
-  const handleDelete = async (table: 'links' | 'social_links', id: string) => {
+  const handleDelete = async (table: any, id: string) => {
     if (!confirm("Excluir permanentemente?")) return;
     setLoading(true);
-    try {
-      await supabase.from(table).delete().eq('id', id);
-      table === 'links' ? await fetchLinks() : await fetchSocials();
-    } catch (err) { alert("Erro ao excluir"); } finally { setLoading(false); }
+    await supabase.from(table).delete().eq('id', id);
+    table === 'links' ? await fetchLinks() : await fetchSocials();
+    setLoading(false);
   };
 
   const sortedCategories = useMemo(() => {
-    const foundCats = Array.from(new Set(links.map(l => (l.category || 'Página 1').trim())));
-    if (foundCats.length === 0) return ['Página 1'];
-    const existingOrder = pagesOrder.filter(c => foundCats.includes(c));
-    foundCats.forEach(c => { if (!orderedIncludes(existingOrder, c)) existingOrder.push(c); });
-    return existingOrder;
+    const found = Array.from(new Set(links.map(l => (l.category || 'Página 1').trim())));
+    if (found.length === 0) return ['Página 1'];
+    const order = pagesOrder.filter(c => found.includes(c));
+    found.forEach(c => { if (!order.includes(c)) order.push(c); });
+    return order;
   }, [links, pagesOrder]);
 
-  const orderedIncludes = (arr: string[], val: string) => {
-      return arr.some(item => item.trim().toLowerCase() === val.trim().toLowerCase());
-  }
-
-  const filteredLinks = useMemo(() => {
-    return links.filter(l => (l.category || 'Página 1').trim() === activeAdminPage.trim()).sort((a, b) => a.position - b.position);
-  }, [links, activeAdminPage]);
-
   return (
-    <div className="w-full max-w-5xl mx-auto p-4 md:p-10 bg-[#050505] min-h-screen text-white pb-32 font-sans relative">
-      {loading && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[9999] flex items-center justify-center">
-          <div className="flex flex-col items-center gap-4">
-            <div className="animate-spin rounded-full h-14 w-14 border-t-2 border-b-2 border-yellow-500"></div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-yellow-500">Sincronizando Dados...</p>
-          </div>
-        </div>
-      )}
-
+    <div className="w-full max-w-5xl mx-auto p-4 md:p-10 bg-[#050505] min-h-screen text-white pb-32">
+      {loading && <div className="fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center font-black uppercase text-yellow-500 tracking-widest animate-pulse">Sincronizando...</div>}
+      
       <div className="flex justify-between items-center mb-10 border-b border-white/5 pb-8">
-        <div>
-          <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter">CENTRAL DE CONTROLE</h2>
-          <p className="text-[9px] text-gray-500 uppercase font-black mt-1 tracking-widest">Painel Administrativo VIP</p>
-        </div>
-        <button onClick={() => { supabase.auth.signOut(); window.location.reload(); }} className="px-6 py-2 bg-white/5 text-red-500 border border-red-500/20 rounded-xl text-[9px] font-black uppercase hover:bg-red-500 hover:text-white transition-all">Encerrar Sessão</button>
+        <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter">CONTROLE MASTER 3.0</h2>
+        <button onClick={() => { supabase.auth.signOut(); window.location.hash = '#/'; window.location.reload(); }} className="px-6 py-2 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl text-[9px] font-black uppercase">Sair</button>
       </div>
 
       <div className="grid grid-cols-3 gap-3 mb-12">
-        {(['links', 'social', 'brand'] as const).map(menu => (
-          <button key={menu} onClick={() => setActiveMenu(menu)} className={`py-5 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest border transition-all ${activeMenu === menu ? 'bg-yellow-500 text-black border-yellow-500 shadow-lg' : 'bg-white/5 text-gray-400 border-white/5 hover:bg-white/10'}`}>
-            {menu === 'links' ? '🎰 Plataformas' : menu === 'social' ? '📱 Redes' : '🎨 Identidade'}
+        {(['links', 'social', 'brand'] as const).map(m => (
+          <button key={m} onClick={() => setActiveMenu(m)} className={`py-5 rounded-[1.8rem] text-[10px] font-black uppercase border transition-all ${activeMenu === m ? 'bg-yellow-500 text-black border-yellow-500 shadow-lg' : 'bg-white/5 text-gray-400 border-white/5'}`}>
+            {m === 'links' ? '🎰 Links' : m === 'social' ? '📱 Social' : '🎨 Estilo'}
           </button>
         ))}
       </div>
 
       {activeMenu === 'brand' && (
-        <div className="animate-fade-in space-y-8">
-          <form onSubmit={handleSaveBrand} className="bg-[#0f0f0f] p-8 rounded-[3rem] border border-white/5 shadow-2xl space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-4">
-                <label className="text-[10px] uppercase font-black text-gray-500 flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span> Logo / Avatar Master
-                </label>
-                <div className="flex items-center gap-6 bg-black/40 p-5 rounded-[2rem] border border-white/5">
-                  <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-yellow-500/30 bg-black flex-shrink-0 shadow-xl">
-                    <img src={brand.logoUrl} className="w-full h-full object-cover" alt="Preview" />
-                  </div>
-                  <div className="flex-grow space-y-2">
-                    <input type="file" ref={logoInputRef} onChange={(e) => handleFileUpload(e, 'logo')} className="hidden" accept="image/*" />
-                    <button type="button" onClick={() => logoInputRef.current?.click()} className="w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl text-[9px] font-black uppercase border border-white/10 transition-all">Alterar Imagem</button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <label className="text-[10px] uppercase font-black text-gray-500 flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span> Fundo da Página (Wallpaper)
-                </label>
-                <div className="flex items-center gap-6 bg-black/40 p-5 rounded-[2rem] border border-white/5">
-                  <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-white/10 bg-black flex-shrink-0 shadow-xl relative">
-                    {brand.backgroundUrl ? (
-                      <img src={brand.backgroundUrl} className="w-full h-full object-cover" alt="Preview BG" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-[8px] text-gray-700 uppercase">Vazio</div>
-                    )}
-                  </div>
-                  <div className="flex-grow space-y-2">
-                    <input type="file" ref={bgInputRef} onChange={(e) => handleFileUpload(e, 'bg')} className="hidden" accept="image/*" />
-                    <button type="button" onClick={() => bgInputRef.current?.click()} className="w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl text-[9px] font-black uppercase border border-white/10 transition-all">Enviar Fundo</button>
-                    <button type="button" onClick={() => setBrand({...brand, backgroundUrl: ''})} className="w-full py-2 text-red-500 text-[8px] font-black uppercase hover:bg-red-500/5 rounded-lg transition-all">Remover</button>
-                  </div>
-                </div>
-              </div>
+        <form onSubmit={handleSaveBrand} className="bg-[#0f0f0f] p-8 rounded-[3rem] border border-white/5 space-y-8">
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="p-6 bg-black rounded-[2rem] border border-white/5 flex items-center gap-4">
+              <img src={brand.logoUrl} className="w-16 h-16 rounded-full object-cover border-2 border-yellow-500" />
+              <button type="button" onClick={() => logoInputRef.current?.click()} className="flex-1 py-3 bg-white/5 rounded-xl text-[9px] font-black uppercase">Alterar Logo</button>
+              <input type="file" ref={logoInputRef} onChange={e => handleFileUpload(e, 'logo')} className="hidden" />
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Nome da Marca</label>
-                <input className="w-full p-5 rounded-2xl bg-black border border-white/10 text-white text-sm focus:border-yellow-500 outline-none" value={brand.name} onChange={e => setBrand({...brand, name: e.target.value})} required />
+            <div className="p-6 bg-black rounded-[2rem] border border-white/5 flex items-center gap-4">
+              <div className="w-16 h-16 bg-white/5 rounded-xl border border-white/10 flex items-center justify-center">
+                {brand.backgroundUrl ? <img src={brand.backgroundUrl} className="w-full h-full object-cover" /> : <span className="text-[8px]">SEM FUNDO</span>}
               </div>
-              <div className="space-y-2">
-                <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Slogan Principal</label>
-                <input className="w-full p-5 rounded-2xl bg-black border border-white/10 text-white text-sm focus:border-yellow-500 outline-none" value={brand.tagline} onChange={e => setBrand({...brand, tagline: e.target.value})} required />
-              </div>
+              <button type="button" onClick={() => bgInputRef.current?.click()} className="flex-1 py-3 bg-white/5 rounded-xl text-[9px] font-black uppercase">Alterar Fundo</button>
+              <input type="file" ref={bgInputRef} onChange={e => handleFileUpload(e, 'bg')} className="hidden" />
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Efeito de Partículas</label>
-                <select className="w-full p-5 rounded-2xl bg-black border border-white/10 text-white text-sm outline-none" value={brand.effect || 'scanner'} onChange={e => setBrand({...brand, effect: e.target.value as any})}>
-                  <option value="scanner">Scanner Gold</option>
-                  <option value="gold-rain">Chuva de Ouro</option>
-                  <option value="matrix">Matrix Code</option>
-                  <option value="fire">Chamas (Ember)</option>
-                  <option value="money">Dinheiro Caindo</option>
-                  <option value="space">Espaço (Estrelas)</option>
-                  <option value="aurora">Aurora Boreal</option>
-                  <option value="glitch">Glitch Lines</option>
-                  <option value="confetti">Confetti Party</option>
-                  <option value="snow">Neve</option>
-                  <option value="lightning">Trovões (Flash)</option>
-                  <option value="none">Nenhum</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[9px] uppercase font-black text-gray-500 ml-1">Texto do Rodapé</label>
-                <input className="w-full p-5 rounded-2xl bg-black border border-white/10 text-white text-sm focus:border-yellow-500 outline-none" value={brand.footerText?.split('ORDER:')[0] || ''} onChange={e => setBrand({...brand, footerText: e.target.value})} />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-5 bg-black rounded-2xl border border-white/5">
-              <input type="checkbox" id="v-brand" checked={brand.verified} onChange={e => setBrand({...brand, verified: e.target.checked})} className="w-5 h-5 accent-yellow-500" />
-              <label htmlFor="v-brand" className="text-xs font-black uppercase text-gray-300">Exibir Selo de Verificação Blue</label>
-            </div>
-            
-            <button type="submit" className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">Salvar Identidade Visual</button>
-          </form>
-        </div>
+          </div>
+          <div className="grid md:grid-cols-2 gap-6">
+            <input className="bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" placeholder="Nome" value={brand.name} onChange={e => setBrand({...brand, name: e.target.value})} />
+            <input className="bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" placeholder="Slogan" value={brand.tagline} onChange={e => setBrand({...brand, tagline: e.target.value})} />
+            <select className="bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" value={brand.effect} onChange={e => setBrand({...brand, effect: e.target.value as any})}>
+              <option value="scanner">Scanner Gold</option><option value="gold-rain">Chuva de Ouro</option><option value="matrix">Matrix</option><option value="fire">Fire Ember</option><option value="money">Money Rain</option><option value="space">Space Stars</option><option value="aurora">Aurora</option><option value="glitch">Glitch</option><option value="confetti">Confetti</option><option value="snow">Snow</option><option value="lightning">Lightning</option><option value="none">Nenhum</option>
+            </select>
+            <input className="bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" placeholder="Rodapé" value={brand.footerText?.split('ORDER:')[0] || ''} onChange={e => setBrand({...brand, footerText: e.target.value})} />
+          </div>
+          <button type="submit" className="w-full py-6 bg-yellow-500 text-black font-black rounded-3xl uppercase text-xs">Salvar Alterações</button>
+        </form>
       )}
 
       {activeMenu === 'links' && (
-        <div className="animate-fade-in space-y-8">
-          <div className="flex flex-wrap gap-2 p-3 bg-white/[0.02] border border-white/5 rounded-[2.2rem] items-center">
-            {sortedCategories.map((cat, idx) => (
-              <div key={cat} className="flex items-center bg-black/40 rounded-full border border-white/5 overflow-hidden shadow-lg">
-                <button onClick={() => setActiveAdminPage(cat)} className={`px-6 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeAdminPage.trim() === cat.trim() ? 'bg-white text-black' : 'text-gray-500 hover:text-white'}`}>
-                  {cat}
-                </button>
-                <div className="flex border-l border-white/5 bg-black/60">
-                  <button disabled={idx === 0} onClick={() => moveCategory(cat, 'left')} className="px-3 py-3 text-xs hover:text-yellow-500 disabled:opacity-20 transition-colors">←</button>
-                  <button disabled={idx === sortedCategories.length - 1} onClick={() => moveCategory(cat, 'right')} className="px-3 py-3 text-xs hover:text-yellow-500 disabled:opacity-20 transition-colors">→</button>
-                </div>
+        <div className="space-y-8 animate-fade-in">
+          <div className="flex flex-wrap gap-2 p-4 bg-white/5 border border-white/5 rounded-[2.5rem]">
+            {sortedCategories.map((c, i) => (
+              <div key={c} className={`flex items-center rounded-full border border-white/10 overflow-hidden ${activeAdminPage === c ? 'bg-white text-black' : 'bg-black/40 text-gray-400'}`}>
+                <button onClick={() => setActiveAdminPage(c)} className="px-6 py-3 text-[9px] font-black uppercase">{c}</button>
+                <button onClick={() => moveCategory(c, 'left')} className="px-3 border-l border-white/10 hover:text-yellow-500 text-xs">←</button>
+                <button onClick={() => moveCategory(c, 'right')} className="px-3 border-l border-white/10 hover:text-yellow-500 text-xs">→</button>
               </div>
             ))}
-            <button onClick={() => { const n = prompt("Nome da nova página:"); if(n) setActiveAdminPage(n.trim()); }} className="px-4 py-3 text-yellow-500 text-[10px] font-black uppercase tracking-widest hover:bg-yellow-500/10 rounded-full">+ Nova Categoria</button>
+            <button onClick={() => { const n = prompt("Nova página:"); if(n) setActiveAdminPage(n.trim()); }} className="px-4 py-3 text-yellow-500 text-[9px] font-black uppercase">+ Página</button>
           </div>
-          
-          <button onClick={() => setEditingLink({ category: activeAdminPage.trim(), type: 'glass', icon: 'auto', is_highlighted: false })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">+ Adicionar Link em "{activeAdminPage}"</button>
-          
+          <button onClick={() => setEditingLink({ category: activeAdminPage, type: 'glass', icon: 'auto' })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-3xl uppercase text-xs">+ Adicionar Link</button>
           <div className="space-y-4">
-            {filteredLinks.map((link, idx) => (
-              <div key={link.id} className="bg-[#0f0f0f] p-5 rounded-[2rem] flex items-center justify-between border border-white/5 group">
-                <div className="flex items-center gap-4 flex-grow">
-                  <div className="flex flex-col gap-1 items-center">
-                    <span className="text-[7px] font-black text-gray-600 uppercase">Pos</span>
-                    <input type="number" min="1" max={filteredLinks.length} defaultValue={idx + 1} onBlur={(e) => jumpToPosition(link.id!, parseInt(e.target.value))} className="w-10 h-10 bg-black border border-white/10 rounded-lg text-center text-xs font-black focus:border-yellow-500 outline-none transition-colors" />
-                  </div>
-                  <div className={`w-12 h-12 bg-black rounded-xl flex items-center justify-center border border-white/10 ${link.type === 'gold' ? 'text-yellow-500' : 'text-white'}`}>{Icons[link.icon || 'slots'] || Icons.slots}</div>
-                  <div>
-                    <h4 className="font-bold text-sm uppercase flex items-center gap-2">{link.title}{link.badge && <span className="text-[7px] bg-yellow-500 text-black px-1.5 py-0.5 rounded-md font-black">{link.badge}</span>}</h4>
-                    <p className="text-[9px] text-gray-500 uppercase font-black">{link.click_count || 0} Cliques • Estilo: {link.type}</p>
-                  </div>
+            {links.filter(l => (l.category || 'Página 1').trim() === activeAdminPage.trim()).sort((a,b) => a.position - b.position).map((l, i) => (
+              <div key={l.id} className="bg-[#0f0f0f] p-5 rounded-[2rem] flex items-center justify-between border border-white/5">
+                <div className="flex items-center gap-4">
+                  <input type="number" defaultValue={i+1} onBlur={e => jumpToPosition(l.id!, parseInt(e.target.value))} className="w-10 h-10 bg-black border border-white/10 rounded-lg text-center text-xs font-black" />
+                  <div className="w-10 h-10 bg-black rounded-lg border border-white/10 flex items-center justify-center">{Icons[l.icon || 'slots']}</div>
+                  <div><h4 className="font-bold text-sm uppercase">{l.title}</h4><p className="text-[8px] text-gray-500 uppercase">{l.click_count || 0} CLIQUES</p></div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => setEditingLink(link)} className="w-10 h-10 bg-white/5 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors">⚙️</button>
-                  <button onClick={() => handleDelete('links', link.id!)} className="w-10 h-10 bg-red-600/10 text-red-500 flex items-center justify-center rounded-lg hover:bg-red-600 hover:text-white transition-colors">🗑️</button>
+                  <button onClick={() => setEditingLink(l)} className="p-3 bg-white/5 rounded-xl">⚙️</button>
+                  <button onClick={() => handleDelete('links', l.id!)} className="p-3 bg-red-500/10 text-red-500 rounded-xl">🗑️</button>
                 </div>
               </div>
             ))}
@@ -396,49 +238,51 @@ const AdminPanel: React.FC = () => {
       )}
 
       {activeMenu === 'social' && (
-        <div className="animate-fade-in space-y-6">
-          <button onClick={() => setEditingSocial({ name: '', url: '', icon: 'instagram' })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-[2.5rem] uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">+ Adicionar Rede Social</button>
-          <div className="space-y-4">
-            {socials.map((social) => (
-              <div key={social.id} className="bg-[#0f0f0f] p-5 rounded-[2rem] flex items-center justify-between border border-white/5">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center border border-white/10 text-white">{Icons[social.icon] || social.name.charAt(0)}</div>
-                  <div>
-                    <h4 className="font-bold text-sm uppercase">{social.name}</h4>
-                    <p className="text-[9px] text-gray-500 uppercase truncate max-w-[200px]">{social.url}</p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => setEditingSocial(social)} className="w-10 h-10 bg-white/5 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors">⚙️</button>
-                  <button onClick={() => handleDelete('social_links', social.id!)} className="w-10 h-10 bg-red-600/10 text-red-500 flex items-center justify-center rounded-lg hover:bg-red-600 hover:text-white transition-colors">🗑️</button>
-                </div>
+        <div className="space-y-6 animate-fade-in">
+          <button onClick={() => setEditingSocial({ name: '', url: '', icon: 'instagram' })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-3xl uppercase text-xs">+ Adicionar Rede</button>
+          {socials.map(s => (
+            <div key={s.id} className="bg-[#0f0f0f] p-5 rounded-[2rem] flex items-center justify-between border border-white/5">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-black rounded-lg border border-white/10 flex items-center justify-center">{Icons[s.icon]}</div>
+                <h4 className="font-bold text-sm uppercase">{s.name}</h4>
               </div>
-            ))}
-          </div>
+              <div className="flex gap-2">
+                <button onClick={() => setEditingSocial(s)} className="p-3 bg-white/5 rounded-xl">⚙️</button>
+                <button onClick={() => handleDelete('social_links', s.id!)} className="p-3 bg-red-500/10 text-red-500 rounded-xl">🗑️</button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Modais de Edição com Design Consistente */}
       {editingLink && (
-        <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 z-[10000] overflow-y-auto">
-          <form onSubmit={handleSaveLink} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-xl my-auto space-y-5 shadow-2xl">
-            <h3 className="text-xl font-black uppercase text-yellow-500 mb-4 italic">Configurar Link</h3>
+        <div className="fixed inset-0 bg-black/95 z-[10000] flex items-center justify-center p-4 overflow-y-auto">
+          <form onSubmit={handleSaveLink} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-xl space-y-5">
+            <h3 className="text-xl font-black uppercase text-yellow-500 italic">Configurar Link</h3>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Título</label><input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white focus:border-yellow-500 outline-none" value={editingLink.title || ''} onChange={e => setEditingLink({...editingLink, title: e.target.value})} required /></div>
-              <div className="space-y-1.5"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Página</label><input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white focus:border-yellow-500 outline-none" value={editingLink.category || ''} onChange={e => setEditingLink({...editingLink, category: e.target.value})} required /></div>
+              <input className="bg-black p-4 rounded-xl text-sm border border-white/10" placeholder="Título" value={editingLink.title || ''} onChange={e => setEditingLink({...editingLink, title: e.target.value})} required />
+              <input className="bg-black p-4 rounded-xl text-sm border border-white/10" placeholder="Página (ex: Roleta)" value={editingLink.category || ''} onChange={e => setEditingLink({...editingLink, category: e.target.value})} required />
             </div>
-            <div className="space-y-1.5"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Descrição</label><input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white focus:border-yellow-500 outline-none" value={editingLink.description || ''} onChange={e => setEditingLink({...editingLink, description: e.target.value})} /></div>
-            <div className="space-y-1.5"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">URL (Destino)</label><input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white focus:border-yellow-500 outline-none" value={editingLink.url || ''} onChange={e => setEditingLink({...editingLink, url: e.target.value})} required /></div>
+            <input className="w-full bg-black p-4 rounded-xl text-sm border border-white/10" placeholder="Descrição" value={editingLink.description || ''} onChange={e => setEditingLink({...editingLink, description: e.target.value})} />
+            <input className="w-full bg-black p-4 rounded-xl text-sm border border-white/10" placeholder="URL Destino" value={editingLink.url || ''} onChange={e => setEditingLink({...editingLink, url: e.target.value})} required />
             <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-1.5"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Estilo</label><select className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white outline-none" value={editingLink.type || 'glass'} onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}><option value="glass">Glass</option><option value="gold">Gold</option><option value="neon-purple">Neon Purple</option><option value="neon-green">Neon Green</option></select></div>
-              <div className="space-y-1.5"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Ícone</label><select className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white outline-none" value={editingLink.icon || 'auto'} onChange={e => setEditingLink({...editingLink, icon: e.target.value})}><option value="auto">Auto</option>{Object.keys(Icons).map(k => <option key={k} value={k}>{k}</option>)}</select></div>
-              <div className="space-y-1.5"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Badge</label><input className="w-full p-4 rounded-xl text-sm bg-black border border-white/10 text-white outline-none" value={editingLink.badge || ''} onChange={e => setEditingLink({...editingLink, badge: e.target.value.toUpperCase()})} placeholder="EX: BÔNUS" /></div>
+              <select className="bg-black p-4 rounded-xl text-xs border border-white/10" value={editingLink.type} onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}><option value="glass">Glass</option><option value="gold">Gold</option><option value="neon-purple">Neon P.</option><option value="neon-green">Neon G.</option></select>
+              <select className="bg-black p-4 rounded-xl text-xs border border-white/10" value={editingLink.icon} onChange={e => setEditingLink({...editingLink, icon: e.target.value})}><option value="auto">Auto</option>{Object.keys(Icons).map(k => <option key={k} value={k}>{k}</option>)}</select>
+              <input className="bg-black p-4 rounded-xl text-xs border border-white/10" placeholder="Badge" value={editingLink.badge || ''} onChange={e => setEditingLink({...editingLink, badge: e.target.value.toUpperCase()})} />
             </div>
-            <div className="flex items-center gap-2 p-3 bg-white/5 rounded-xl"><input type="checkbox" id="high-check" checked={editingLink.is_highlighted} onChange={e => setEditingLink({...editingLink, is_highlighted: e.target.checked})} className="w-4 h-4 accent-yellow-500" /><label htmlFor="high-check" className="text-[9px] font-black uppercase text-gray-300">Destacar Link</label></div>
-            <div className="flex gap-3 pt-4 border-t border-white/5">
-              <button type="button" onClick={() => setEditingLink(null)} className="flex-1 py-4 bg-white/5 rounded-2xl uppercase font-black text-[10px]">Cancelar</button>
-              <button type="submit" className="flex-[2] py-4 bg-yellow-500 text-black rounded-2xl uppercase font-black text-[10px]">Salvar Link</button>
-            </div>
+            <div className="flex gap-3 pt-4"><button type="button" onClick={() => setEditingLink(null)} className="flex-1 py-4 bg-white/5 rounded-2xl font-black uppercase text-[10px]">Cancelar</button><button type="submit" className="flex-[2] py-4 bg-yellow-500 text-black rounded-2xl font-black uppercase text-[10px]">Salvar Link</button></div>
+          </form>
+        </div>
+      )}
+
+      {editingSocial && (
+        <div className="fixed inset-0 bg-black/95 z-[10000] flex items-center justify-center p-4">
+          <form onSubmit={e => { e.preventDefault(); setLoading(true); const p = {...editingSocial}; delete (p as any).id; if(editingSocial.id) supabase.from('social_links').update(p).eq('id', editingSocial.id).then(()=>fetchSocials().then(()=>setEditingSocial(null))); else supabase.from('social_links').insert([p]).then(()=>fetchSocials().then(()=>setEditingSocial(null))); setLoading(false); }} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-md space-y-5">
+            <h3 className="text-xl font-black uppercase text-yellow-500 italic">Rede Social</h3>
+            <input className="w-full bg-black p-4 rounded-xl border border-white/10" placeholder="Nome" value={editingSocial.name || ''} onChange={e => setEditingSocial({...editingSocial, name: e.target.value})} required />
+            <input className="w-full bg-black p-4 rounded-xl border border-white/10" placeholder="URL" value={editingSocial.url || ''} onChange={e => setEditingSocial({...editingSocial, url: e.target.value})} required />
+            <select className="w-full bg-black p-4 rounded-xl border border-white/10" value={editingSocial.icon} onChange={e => setEditingSocial({...editingSocial, icon: e.target.value})}><option value="instagram">Instagram</option><option value="telegram">Telegram</option><option value="whatsapp">WhatsApp</option><option value="twitter">X</option><option value="youtube">YouTube</option></select>
+            <div className="flex gap-3 pt-4"><button type="button" onClick={() => setEditingSocial(null)} className="flex-1 py-4 bg-white/5 rounded-2xl font-black uppercase text-[10px]">Cancelar</button><button type="submit" className="flex-[2] py-4 bg-yellow-500 text-black rounded-2xl font-black uppercase text-[10px]">Salvar Rede</button></div>
           </form>
         </div>
       )}
