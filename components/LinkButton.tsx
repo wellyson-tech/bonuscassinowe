@@ -13,10 +13,12 @@ const LinkButton: React.FC<Props> = ({ link, isAdminView = false }) => {
   const handleLinkClick = async (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (isAdminView) return;
     
+    // Previne a navegação imediata para dar tempo ao banco de dados
     e.preventDefault();
     const targetUrl = link.url;
 
     try {
+      // Tenta atualizar o contador no banco
       await supabase
         .from('links')
         .update({ click_count: (link.click_count || 0) + 1 })
@@ -24,6 +26,7 @@ const LinkButton: React.FC<Props> = ({ link, isAdminView = false }) => {
     } catch (err) {
       console.error("Erro ao registrar clique:", err);
     } finally {
+      // Abre o link em uma nova aba após a tentativa de salvamento
       window.open(targetUrl, '_blank', 'noopener,noreferrer');
     }
   };
@@ -53,6 +56,8 @@ const LinkButton: React.FC<Props> = ({ link, isAdminView = false }) => {
         const cleanUrl = link.url.trim();
         const urlWithProtocol = cleanUrl.startsWith('http') ? cleanUrl : `https://${cleanUrl}`;
         const domain = new URL(urlWithProtocol).hostname;
+        
+        // Tentando FaviconKit (128px) como fonte primária por ser maior e melhor qualidade
         const faviconUrl = `https://api.faviconkit.com/${domain}/128`;
         const fallbackFaviconUrl = `https://icons.duckduckgo.com/ip3/${domain}.ico`;
         
@@ -64,9 +69,11 @@ const LinkButton: React.FC<Props> = ({ link, isAdminView = false }) => {
               className="w-full h-full object-contain filter drop-shadow-md brightness-110" 
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
+                // Se o FaviconKit falhar, tenta o DuckDuckGo
                 if (target.src === faviconUrl) {
                   target.src = fallbackFaviconUrl;
                 } else {
+                  // Se ambos falharem, mostra o ícone padrão
                   target.style.display = 'none';
                   if (target.parentElement) target.parentElement.innerHTML = '<div class="w-8 h-8 opacity-40">' + (Icons.slots as any) + '</div>';
                 }
@@ -101,14 +108,7 @@ const LinkButton: React.FC<Props> = ({ link, isAdminView = false }) => {
       <div className="flex-shrink-0 z-10 group-hover:rotate-6 transition-transform duration-500">{renderIcon()}</div>
       <div className="flex-grow text-left z-10">
         <div className="flex items-center gap-2">
-          <h3 className="text-[16px] font-black uppercase tracking-tight leading-tight flex items-center gap-1.5">
-            {link.title}
-            {link.is_verified && (
-              <svg className="w-4 h-4 text-green-500 fill-current" viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-              </svg>
-            )}
-          </h3>
+          <h3 className="text-[16px] font-black uppercase tracking-tight leading-tight">{link.title}</h3>
           {link.badge && (
             <span className={`text-[8px] px-2 py-1 rounded-lg font-black uppercase animate-pulse shadow-xl ${
               link.type === 'gold' ? 'bg-black text-yellow-500' : 'bg-yellow-500 text-black'

@@ -11,7 +11,6 @@ export interface CasinoLink {
   position: number;
   click_count?: number;
   is_highlighted: boolean;
-  is_verified?: boolean; // Novo campo para o "certinho verde"
   created_at?: string;
 }
 
