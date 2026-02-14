@@ -30,4 +30,10 @@ export interface CasinoBrand {
   verified: boolean;
   footerText?: string;
   effect?: 'scanner' | 'gold-rain' | 'cyber-grid' | 'nebula' | 'matrix' | 'fire' | 'money' | 'space' | 'aurora' | 'glitch' | 'confetti' | 'snow' | 'lightning' | 'none';
+  // Novos campos para a Roleta/Sala VIP
+  roletaTitle?: string;
+  roletaTagline?: string;
+  roletaLogoUrl?: string;
+  roletaEffect?: string;
+  roletaBadgeText?: string;
 }

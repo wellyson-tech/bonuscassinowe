@@ -64,7 +64,12 @@ const App: React.FC = () => {
           backgroundUrl: data.background_url,
           verified: data.verified,
           footerText: data.footer_text,
-          effect: data.effect || 'scanner'
+          effect: data.effect || 'scanner',
+          roletaTitle: data.roleta_title || 'SALA VIP',
+          roletaTagline: data.roleta_tagline || 'ROLETA ESTRATÉGICA',
+          roletaLogoUrl: data.roleta_logo_url || data.logo_url,
+          roletaEffect: data.roleta_effect || 'scanner',
+          roletaBadgeText: data.roleta_badge_text || 'Acesso Restrito VIP'
         });
         
         if (data.footer_text && data.footer_text.includes('ORDER:')) {
@@ -92,7 +97,6 @@ const App: React.FC = () => {
     const foundCats: string[] = [];
     links.forEach(l => {
       const name = (l.category || 'Página 1').trim();
-      // A categoria "Roleta" é oculta da navegação principal, acessada apenas pelo link direto
       if (name.toLowerCase() !== 'roleta' && !foundCats.includes(name)) foundCats.push(name);
     });
     const ordered = pagesOrder.filter(c => foundCats.includes(c));
@@ -112,7 +116,7 @@ const App: React.FC = () => {
   }, [links]);
 
   const BackgroundElements = ({ isRoleta = false }) => {
-    const effect = isRoleta ? 'scanner' : (brand.effect || 'scanner');
+    const effect = isRoleta ? (brand.roletaEffect || 'scanner') : (brand.effect || 'scanner');
     return (
       <div className="effect-container fixed inset-0 pointer-events-none z-0">
         <div className="absolute inset-0 bg-black -z-30" />
@@ -121,7 +125,6 @@ const App: React.FC = () => {
                style={{ backgroundImage: `url(${brand.backgroundUrl})`, backgroundAttachment: 'fixed' }} />
         )}
         
-        {/* Renderização dinâmica dos elementos do CSS */}
         {effect === 'scanner' && <div className="scanner-beam" style={isRoleta ? { background: 'linear-gradient(110deg, transparent, rgba(168, 85, 247, 0.15) 50%, transparent)' } : {}} />}
         
         {effect === 'gold-rain' && Array.from({ length: 30 }).map((_, i) => (
@@ -140,7 +143,7 @@ const App: React.FC = () => {
           <div key={i} className="star" style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%`, animationDuration: `${3 + Math.random() * 8}s` }} />
         ))}
 
-        {effect === 'aurora' && <div className="aurora-layer" />}
+        {effect === 'aurora' && <div className="aurora-layer" style={isRoleta ? { background: 'linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.1), rgba(99, 102, 241, 0.1), transparent)' } : {}} />}
         {effect === 'lightning' && <div className="lightning-flash animate-lightning" />}
         {effect === 'glitch' && Array.from({ length: 10 }).map((_, i) => (
           <div key={i} className="glitch-line" style={{ top: `${Math.random() * 100}%`, animationDelay: `${Math.random() * 2}s` }} />
@@ -199,12 +202,18 @@ const App: React.FC = () => {
             <div className="relative mb-8">
               <div className="absolute inset-0 bg-purple-500/40 blur-[70px] rounded-full scale-110"></div>
               <div className="w-32 h-32 p-1 rounded-full bg-gradient-to-br from-purple-400 to-indigo-600 relative shadow-2xl overflow-hidden">
-                <img src={brand.logoUrl} className="w-full h-full rounded-full object-cover border-[5px] border-black" alt="Logo" />
+                <img src={brand.roletaLogoUrl || brand.logoUrl} className="w-full h-full rounded-full object-cover border-[5px] border-black" alt="Logo VIP" />
               </div>
             </div>
-            <div className="inline-block px-4 py-1 rounded-full border border-purple-500/30 bg-purple-500/10 text-purple-400 text-[9px] font-black uppercase tracking-[0.4em] mb-4">Acesso Restrito VIP</div>
-            <h1 className="text-5xl font-black uppercase italic tracking-tighter text-shimmer leading-none mb-2">SALA VIP</h1>
-            <h2 className="text-xl font-black uppercase italic tracking-tighter text-white opacity-70">ROLETA ESTRATÉGICA</h2>
+            <div className="inline-block px-4 py-1 rounded-full border border-purple-500/30 bg-purple-500/10 text-purple-400 text-[9px] font-black uppercase tracking-[0.4em] mb-4">
+              {brand.roletaBadgeText}
+            </div>
+            <h1 className="text-5xl font-black uppercase italic tracking-tighter text-shimmer leading-none mb-2">
+              {brand.roletaTitle}
+            </h1>
+            <h2 className="text-xl font-black uppercase italic tracking-tighter text-white opacity-70">
+              {brand.roletaTagline}
+            </h2>
           </header>
 
           <div className="w-full space-y-4 mb-16">

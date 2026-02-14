@@ -6,6 +6,7 @@ import { Icons, BRAND as DEFAULT_BRAND, ADMIN_UID } from '../constants';
 
 const AdminPanel: React.FC = () => {
   const [activeMenu, setActiveMenu] = useState<'links' | 'social' | 'brand'>('links');
+  const [activeBrandTab, setActiveBrandTab] = useState<'geral' | 'roleta'>('geral');
   const [links, setLinks] = useState<CasinoLink[]>([]);
   const [socials, setSocials] = useState<SocialLink[]>([]);
   const [brand, setBrand] = useState<CasinoBrand>(DEFAULT_BRAND);
@@ -17,6 +18,7 @@ const AdminPanel: React.FC = () => {
   const [pagesOrder, setPagesOrder] = useState<string[]>([]);
   
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const roletaLogoInputRef = useRef<HTMLInputElement>(null);
   const bgInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -41,7 +43,12 @@ const AdminPanel: React.FC = () => {
           backgroundUrl: data.background_url,
           verified: data.verified,
           footerText: data.footer_text,
-          effect: data.effect || 'scanner'
+          effect: data.effect || 'scanner',
+          roletaTitle: data.roleta_title || 'SALA VIP',
+          roletaTagline: data.roleta_tagline || 'ROLETA ESTRATÉGICA',
+          roletaLogoUrl: data.roleta_logo_url || data.logo_url,
+          roletaEffect: data.roleta_effect || 'scanner',
+          roletaBadgeText: data.roleta_badge_text || 'Acesso Restrito VIP'
         });
         
         if (data.footer_text && data.footer_text.includes('ORDER:')) {
@@ -64,7 +71,7 @@ const AdminPanel: React.FC = () => {
     });
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'bg') => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'roleta_logo' | 'bg') => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 1.5 * 1024 * 1024) { alert("Arquivo muito grande (Máx 1.5MB)"); return; }
@@ -72,8 +79,9 @@ const AdminPanel: React.FC = () => {
     try {
       const base64 = await convertFileToBase64(file);
       if (type === 'logo') setBrand(prev => ({ ...prev, logoUrl: base64 }));
+      else if (type === 'roleta_logo') setBrand(prev => ({ ...prev, roletaLogoUrl: base64 }));
       else setBrand(prev => ({ ...prev, backgroundUrl: base64 }));
-      alert("Imagem carregada! Clique em Salvar Alterações.");
+      alert("Imagem carregada! Não esqueça de Salvar Alterações.");
     } catch (error) { alert('Erro ao processar imagem'); } finally { setLoading(false); }
   };
 
@@ -126,9 +134,15 @@ const AdminPanel: React.FC = () => {
     await supabase.from('brand_settings').update({
       name: brand.name, tagline: brand.tagline, logo_url: brand.logoUrl,
       background_url: brand.backgroundUrl, verified: brand.verified,
-      footer_text: finalFooter, effect: brand.effect
+      footer_text: finalFooter, effect: brand.effect,
+      // Novos campos salvos no Supabase
+      roleta_title: brand.roletaTitle,
+      roleta_tagline: brand.roletaTagline,
+      roleta_logo_url: brand.roletaLogoUrl,
+      roleta_effect: brand.roletaEffect,
+      roleta_badge_text: brand.roletaBadgeText
     }).eq('id', 1);
-    alert("Identidade Visual Atualizada!");
+    alert("Todas as Identidades (Geral e VIP) foram salvas!");
     setLoading(false);
   };
 
@@ -168,7 +182,7 @@ const AdminPanel: React.FC = () => {
       
       <div className="flex justify-between items-center mb-10 border-b border-white/5 pb-8">
         <div>
-          <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter">CONTROLE MASTER 3.0</h2>
+          <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter">CONTROLE MASTER 3.5</h2>
           <p className="text-[9px] text-gray-500 uppercase font-black">Gerencie sua sala VIP e links principais</p>
         </div>
         <div className="flex gap-3">
@@ -180,48 +194,60 @@ const AdminPanel: React.FC = () => {
       <div className="grid grid-cols-3 gap-3 mb-12">
         {(['links', 'social', 'brand'] as const).map(m => (
           <button key={m} onClick={() => setActiveMenu(m)} className={`py-5 rounded-[1.8rem] text-[10px] font-black uppercase border transition-all ${activeMenu === m ? 'bg-yellow-500 text-black border-yellow-500 shadow-lg' : 'bg-white/5 text-gray-400 border-white/5'}`}>
-            {m === 'links' ? '🎰 Meus Links' : m === 'social' ? '📱 Social' : '🎨 Estilo'}
+            {m === 'links' ? '🎰 Links' : m === 'social' ? '📱 Social' : '🎨 Estilo'}
           </button>
         ))}
       </div>
 
       {activeMenu === 'brand' && (
-        <form onSubmit={handleSaveBrand} className="bg-[#0f0f0f] p-8 rounded-[3rem] border border-white/5 space-y-8 animate-fade-in">
-          <div className="grid md:grid-cols-2 gap-8">
-            <div className="p-6 bg-black rounded-[2rem] border border-white/5 flex items-center gap-4">
-              <img src={brand.logoUrl} className="w-16 h-16 rounded-full object-cover border-2 border-yellow-500" />
-              <button type="button" onClick={() => logoInputRef.current?.click()} className="flex-1 py-3 bg-white/5 rounded-xl text-[9px] font-black uppercase">Mudar Logo</button>
-              <input type="file" ref={logoInputRef} onChange={e => handleFileUpload(e, 'logo')} className="hidden" />
-            </div>
-            <div className="p-6 bg-black rounded-[2rem] border border-white/5 flex items-center gap-4">
-              <div className="w-16 h-16 bg-white/5 rounded-xl border border-white/10 flex items-center justify-center overflow-hidden">
-                {brand.backgroundUrl ? <img src={brand.backgroundUrl} className="w-full h-full object-cover" /> : <span className="text-[8px] text-gray-500">SEM FUNDO</span>}
+        <form onSubmit={handleSaveBrand} className="space-y-8 animate-fade-in">
+          {/* Sub-menu para Brand */}
+          <div className="flex gap-4 mb-4">
+             <button type="button" onClick={() => setActiveBrandTab('geral')} className={`flex-1 py-4 rounded-2xl text-[9px] font-black uppercase border ${activeBrandTab === 'geral' ? 'bg-white/10 border-yellow-500 text-yellow-500' : 'bg-transparent border-white/5 text-gray-500'}`}>Geral (Home)</button>
+             <button type="button" onClick={() => setActiveBrandTab('roleta')} className={`flex-1 py-4 rounded-2xl text-[9px] font-black uppercase border ${activeBrandTab === 'roleta' ? 'bg-purple-500/10 border-purple-500 text-purple-500' : 'bg-transparent border-white/5 text-gray-500'}`}>Sala VIP (Roleta)</button>
+          </div>
+
+          <div className="bg-[#0f0f0f] p-8 rounded-[3rem] border border-white/5 space-y-8">
+            {activeBrandTab === 'geral' ? (
+              <div className="space-y-8 animate-fade-in">
+                <div className="grid md:grid-cols-2 gap-8">
+                  <div className="p-6 bg-black rounded-[2rem] border border-white/5 flex items-center gap-4">
+                    <img src={brand.logoUrl} className="w-16 h-16 rounded-full object-cover border-2 border-yellow-500" />
+                    <button type="button" onClick={() => logoInputRef.current?.click()} className="flex-1 py-3 bg-white/5 rounded-xl text-[9px] font-black uppercase">Mudar Logo Home</button>
+                    <input type="file" ref={logoInputRef} onChange={e => handleFileUpload(e, 'logo')} className="hidden" />
+                  </div>
+                  <div className="p-6 bg-black rounded-[2rem] border border-white/5 flex items-center gap-4">
+                    <div className="w-16 h-16 bg-white/5 rounded-xl border border-white/10 flex items-center justify-center overflow-hidden">
+                      {brand.backgroundUrl ? <img src={brand.backgroundUrl} className="w-full h-full object-cover" /> : <span className="text-[8px] text-gray-500">PADRÃO</span>}
+                    </div>
+                    <button type="button" onClick={() => bgInputRef.current?.click()} className="flex-1 py-3 bg-white/5 rounded-xl text-[9px] font-black uppercase">Mudar Papel de Parede</button>
+                    <input type="file" ref={bgInputRef} onChange={e => handleFileUpload(e, 'bg')} className="hidden" />
+                  </div>
+                </div>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-1"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Nome Principal</label><input className="w-full bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" value={brand.name} onChange={e => setBrand({...brand, name: e.target.value})} /></div>
+                  <div className="space-y-1"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Slogan Home</label><input className="w-full bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" value={brand.tagline} onChange={e => setBrand({...brand, tagline: e.target.value})} /></div>
+                  <div className="space-y-1"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Efeito Home</label><select className="w-full bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" value={brand.effect} onChange={e => setBrand({...brand, effect: e.target.value as any})}><option value="scanner">Scanner Gold</option><option value="gold-rain">Chuva de Ouro</option><option value="matrix">Matrix</option><option value="fire">Fire Ember</option><option value="money">Money Rain</option><option value="space">Space Stars</option><option value="aurora">Aurora</option><option value="glitch">Glitch</option><option value="confetti">Confetti</option><option value="snow">Snow</option><option value="lightning">Lightning</option><option value="none">Nenhum</option></select></div>
+                  <div className="space-y-1"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Texto Rodapé</label><input className="w-full bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" value={brand.footerText?.split('ORDER:')[0] || ''} onChange={e => setBrand({...brand, footerText: e.target.value})} /></div>
+                </div>
               </div>
-              <button type="button" onClick={() => bgInputRef.current?.click()} className="flex-1 py-3 bg-white/5 rounded-xl text-[9px] font-black uppercase">Mudar Fundo</button>
-              <input type="file" ref={bgInputRef} onChange={e => handleFileUpload(e, 'bg')} className="hidden" />
-            </div>
+            ) : (
+              <div className="space-y-8 animate-fade-in">
+                <div className="p-6 bg-black rounded-[2rem] border border-white/5 flex items-center gap-4">
+                  <img src={brand.roletaLogoUrl || brand.logoUrl} className="w-16 h-16 rounded-full object-cover border-2 border-purple-500" />
+                  <button type="button" onClick={() => roletaLogoInputRef.current?.click()} className="flex-1 py-3 bg-white/5 rounded-xl text-[9px] font-black uppercase">Mudar Logo da Roleta (VIP)</button>
+                  <input type="file" ref={roletaLogoInputRef} onChange={e => handleFileUpload(e, 'roleta_logo')} className="hidden" />
+                </div>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-1"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Título Sala VIP</label><input className="w-full bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" value={brand.roletaTitle} onChange={e => setBrand({...brand, roletaTitle: e.target.value})} /></div>
+                  <div className="space-y-1"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Slogan Sala VIP</label><input className="w-full bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" value={brand.roletaTagline} onChange={e => setBrand({...brand, roletaTagline: e.target.value})} /></div>
+                  <div className="space-y-1"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Texto do Selo VIP</label><input className="w-full bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" value={brand.roletaBadgeText} onChange={e => setBrand({...brand, roletaBadgeText: e.target.value})} /></div>
+                  <div className="space-y-1"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Efeito Sala VIP</label><select className="w-full bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" value={brand.roletaEffect} onChange={e => setBrand({...brand, roletaEffect: e.target.value})}><option value="scanner">Scanner Purple</option><option value="aurora">Aurora VIP</option><option value="fire">Fire Ember</option><option value="money">Money Rain</option><option value="confetti">Confetti</option><option value="none">Nenhum</option></select></div>
+                </div>
+              </div>
+            )}
+            <button type="submit" className="w-full py-6 bg-yellow-500 text-black font-black rounded-3xl uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">Salvar Todas as Alterações</button>
           </div>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="space-y-1">
-              <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Nome da Marca</label>
-              <input className="w-full bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" value={brand.name} onChange={e => setBrand({...brand, name: e.target.value})} />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Slogan</label>
-              <input className="w-full bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" value={brand.tagline} onChange={e => setBrand({...brand, tagline: e.target.value})} />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Efeito de Fundo</label>
-              <select className="w-full bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" value={brand.effect} onChange={e => setBrand({...brand, effect: e.target.value as any})}>
-                <option value="scanner">Scanner Gold</option><option value="gold-rain">Chuva de Ouro</option><option value="matrix">Matrix</option><option value="fire">Fire Ember</option><option value="money">Money Rain</option><option value="space">Space Stars</option><option value="aurora">Aurora</option><option value="glitch">Glitch</option><option value="confetti">Confetti</option><option value="snow">Snow</option><option value="lightning">Lightning</option><option value="none">Nenhum</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Texto Rodapé</label>
-              <input className="w-full bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" value={brand.footerText?.split('ORDER:')[0] || ''} onChange={e => setBrand({...brand, footerText: e.target.value})} />
-            </div>
-          </div>
-          <button type="submit" className="w-full py-6 bg-yellow-500 text-black font-black rounded-3xl uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">Salvar Identidade Visual</button>
         </form>
       )}
 
@@ -235,23 +261,21 @@ const AdminPanel: React.FC = () => {
                 <button onClick={() => moveCategory(c, 'right')} className="px-3 border-l border-white/10 hover:text-yellow-500 text-xs">→</button>
               </div>
             ))}
-            <button onClick={() => { const n = prompt("Nova página (Dica: Use 'Roleta' para a sala VIP):"); if(n) setActiveAdminPage(n.trim()); }} className="px-4 py-3 text-yellow-500 text-[9px] font-black uppercase tracking-widest">+ Nova Página</button>
+            <button onClick={() => { const n = prompt("Nova página (Use 'Roleta' para a VIP):"); if(n) setActiveAdminPage(n.trim()); }} className="px-4 py-3 text-yellow-500 text-[9px] font-black uppercase tracking-widest">+ Nova Página</button>
           </div>
-          
-          <button onClick={() => setEditingLink({ category: activeAdminPage, type: 'glass', icon: 'auto' })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-3xl uppercase text-xs shadow-2xl">+ Adicionar Link em "{activeAdminPage}"</button>
-          
+          <button onClick={() => setEditingLink({ category: activeAdminPage, type: 'glass', icon: 'auto' })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-3xl uppercase text-xs shadow-2xl">+ Link em "{activeAdminPage}"</button>
           <div className="space-y-4">
             {links.filter(l => (l.category || 'Página 1').trim() === activeAdminPage.trim()).sort((a,b) => a.position - b.position).map((l, i) => (
               <div key={l.id} className="bg-[#0f0f0f] p-5 rounded-[2rem] flex items-center justify-between border border-white/5 group">
                 <div className="flex items-center gap-4">
                   <div className="flex flex-col items-center">
-                    <span className="text-[7px] text-gray-500 font-black uppercase">Pos</span>
+                    <span className="text-[7px] text-gray-500 font-black">Pos</span>
                     <input type="number" defaultValue={i+1} onBlur={e => jumpToPosition(l.id!, parseInt(e.target.value))} className="w-10 h-10 bg-black border border-white/10 rounded-lg text-center text-xs font-black" />
                   </div>
                   <div className="w-12 h-12 bg-black rounded-xl border border-white/10 flex items-center justify-center text-yellow-500">{Icons[l.icon || 'slots'] || Icons.slots}</div>
                   <div>
                     <h4 className="font-bold text-sm uppercase flex items-center gap-2">{l.title}{l.badge && <span className="text-[7px] bg-yellow-500 text-black px-1 py-0.5 rounded">{l.badge}</span>}</h4>
-                    <p className="text-[8px] text-gray-500 uppercase">{l.click_count || 0} CLIQUES • ESTILO: {l.type}</p>
+                    <p className="text-[8px] text-gray-500 uppercase">{l.click_count || 0} CLIQUES</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -260,18 +284,13 @@ const AdminPanel: React.FC = () => {
                 </div>
               </div>
             ))}
-            {links.filter(l => (l.category || 'Página 1').trim() === activeAdminPage.trim()).length === 0 && (
-              <div className="py-20 text-center border-2 border-dashed border-white/5 rounded-[2rem]">
-                <p className="text-gray-600 font-black uppercase text-[10px]">Nenhum link nesta página</p>
-              </div>
-            )}
           </div>
         </div>
       )}
 
       {activeMenu === 'social' && (
         <div className="space-y-6 animate-fade-in">
-          <button onClick={() => setEditingSocial({ name: '', url: '', icon: 'instagram' })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-3xl uppercase text-xs shadow-2xl">+ Adicionar Rede Social</button>
+          <button onClick={() => setEditingSocial({ name: '', url: '', icon: 'instagram' })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-3xl uppercase text-xs shadow-2xl">+ Rede Social</button>
           <div className="grid grid-cols-1 gap-4">
             {socials.map(s => (
               <div key={s.id} className="bg-[#0f0f0f] p-5 rounded-[2rem] flex items-center justify-between border border-white/5">
@@ -289,58 +308,34 @@ const AdminPanel: React.FC = () => {
         </div>
       )}
 
+      {/* Modais de Edição mantidos como anteriormente... */}
       {editingLink && (
         <div className="fixed inset-0 bg-black/95 z-[10000] flex items-center justify-center p-4 overflow-y-auto backdrop-blur-sm">
           <form onSubmit={handleSaveLink} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-xl space-y-5 shadow-2xl my-auto">
             <h3 className="text-xl font-black uppercase text-yellow-500 italic mb-4">Configurar Link</h3>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Título</label>
-                <input className="w-full bg-black p-4 rounded-xl text-sm border border-white/10 focus:border-yellow-500 outline-none" value={editingLink.title || ''} onChange={e => setEditingLink({...editingLink, title: e.target.value})} required />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Categoria/Página</label>
-                <input className="w-full bg-black p-4 rounded-xl text-sm border border-white/10 focus:border-yellow-500 outline-none" value={editingLink.category || ''} onChange={e => setEditingLink({...editingLink, category: e.target.value})} required />
-              </div>
+              <div className="space-y-1"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Título</label><input className="w-full bg-black p-4 rounded-xl text-sm border border-white/10 focus:border-yellow-500 outline-none" value={editingLink.title || ''} onChange={e => setEditingLink({...editingLink, title: e.target.value})} required /></div>
+              <div className="space-y-1"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Página</label><input className="w-full bg-black p-4 rounded-xl text-sm border border-white/10 focus:border-yellow-500 outline-none" value={editingLink.category || ''} onChange={e => setEditingLink({...editingLink, category: e.target.value})} required /></div>
             </div>
-            <div className="space-y-1">
-              <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Descrição</label>
-              <input className="w-full bg-black p-4 rounded-xl text-sm border border-white/10 focus:border-yellow-500 outline-none" value={editingLink.description || ''} onChange={e => setEditingLink({...editingLink, description: e.target.value})} />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[8px] uppercase font-black text-gray-500 ml-1">URL de Destino</label>
-              <input className="w-full bg-black p-4 rounded-xl text-sm border border-white/10 focus:border-yellow-500 outline-none" value={editingLink.url || ''} onChange={e => setEditingLink({...editingLink, url: e.target.value})} required />
-            </div>
+            <div className="space-y-1"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">Descrição</label><input className="w-full bg-black p-4 rounded-xl text-sm border border-white/10 focus:border-yellow-500 outline-none" value={editingLink.description || ''} onChange={e => setEditingLink({...editingLink, description: e.target.value})} /></div>
+            <div className="space-y-1"><label className="text-[8px] uppercase font-black text-gray-500 ml-1">URL</label><input className="w-full bg-black p-4 rounded-xl text-sm border border-white/10 focus:border-yellow-500 outline-none" value={editingLink.url || ''} onChange={e => setEditingLink({...editingLink, url: e.target.value})} required /></div>
             <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Estilo</label>
-                <select className="w-full bg-black p-4 rounded-xl text-xs border border-white/10" value={editingLink.type} onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}><option value="glass">Glass</option><option value="gold">Gold</option><option value="neon-purple">Neon Purple</option><option value="neon-green">Neon Green</option></select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Ícone</label>
-                <select className="w-full bg-black p-4 rounded-xl text-xs border border-white/10" value={editingLink.icon} onChange={e => setEditingLink({...editingLink, icon: e.target.value})}><option value="auto">Auto (Favicon)</option>{Object.keys(Icons).map(k => <option key={k} value={k}>{k}</option>)}</select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Badge</label>
-                <input className="w-full bg-black p-4 rounded-xl text-xs border border-white/10" value={editingLink.badge || ''} onChange={e => setEditingLink({...editingLink, badge: e.target.value.toUpperCase()})} placeholder="EX: BÔNUS" />
-              </div>
+              <select className="bg-black p-4 rounded-xl text-xs border border-white/10" value={editingLink.type} onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}><option value="glass">Glass</option><option value="gold">Gold</option><option value="neon-purple">Purple</option><option value="neon-green">Green</option></select>
+              <select className="bg-black p-4 rounded-xl text-xs border border-white/10" value={editingLink.icon} onChange={e => setEditingLink({...editingLink, icon: e.target.value})}><option value="auto">Auto</option>{Object.keys(Icons).map(k => <option key={k} value={k}>{k}</option>)}</select>
+              <input className="bg-black p-4 rounded-xl text-xs border border-white/10" value={editingLink.badge || ''} onChange={e => setEditingLink({...editingLink, badge: e.target.value.toUpperCase()})} placeholder="BADGE" />
             </div>
-            <div className="flex gap-3 pt-6 border-t border-white/5">
-              <button type="button" onClick={() => setEditingLink(null)} className="flex-1 py-4 bg-white/5 rounded-2xl font-black uppercase text-[10px]">Cancelar</button>
-              <button type="submit" className="flex-[2] py-4 bg-yellow-500 text-black rounded-2xl font-black uppercase text-[10px]">Confirmar Alterações</button>
-            </div>
+            <div className="flex gap-3 pt-6 border-t border-white/5"><button type="button" onClick={() => setEditingLink(null)} className="flex-1 py-4 bg-white/5 rounded-2xl font-black uppercase text-[10px]">Cancelar</button><button type="submit" className="flex-[2] py-4 bg-yellow-500 text-black rounded-2xl font-black uppercase text-[10px]">Confirmar</button></div>
           </form>
         </div>
       )}
-
       {editingSocial && (
         <div className="fixed inset-0 bg-black/95 z-[10000] flex items-center justify-center p-4">
           <form onSubmit={e => { e.preventDefault(); setLoading(true); const p = {...editingSocial}; delete (p as any).id; if(editingSocial.id) supabase.from('social_links').update(p).eq('id', editingSocial.id).then(()=>fetchSocials().then(()=>setEditingSocial(null))); else supabase.from('social_links').insert([p]).then(()=>fetchSocials().then(()=>setEditingSocial(null))); setLoading(false); }} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-md space-y-5 shadow-2xl">
             <h3 className="text-xl font-black uppercase text-yellow-500 italic">Rede Social</h3>
             <input className="w-full bg-black p-4 rounded-xl border border-white/10" placeholder="Nome" value={editingSocial.name || ''} onChange={e => setEditingSocial({...editingSocial, name: e.target.value})} required />
-            <input className="w-full bg-black p-4 rounded-xl border border-white/10" placeholder="URL Perfil" value={editingSocial.url || ''} onChange={e => setEditingSocial({...editingSocial, url: e.target.value})} required />
-            <select className="w-full bg-black p-4 rounded-xl border border-white/10" value={editingSocial.icon} onChange={e => setEditingSocial({...editingSocial, icon: e.target.value})}><option value="instagram">Instagram</option><option value="telegram">Telegram</option><option value="whatsapp">WhatsApp</option><option value="twitter">X (Twitter)</option><option value="youtube">YouTube</option></select>
-            <div className="flex gap-3 pt-4"><button type="button" onClick={() => setEditingSocial(null)} className="flex-1 py-4 bg-white/5 rounded-2xl font-black uppercase text-[10px]">Cancelar</button><button type="submit" className="flex-[2] py-4 bg-yellow-500 text-black rounded-2xl font-black uppercase text-[10px]">Salvar Rede</button></div>
+            <input className="w-full bg-black p-4 rounded-xl border border-white/10" placeholder="URL" value={editingSocial.url || ''} onChange={e => setEditingSocial({...editingSocial, url: e.target.value})} required />
+            <select className="w-full bg-black p-4 rounded-xl border border-white/10" value={editingSocial.icon} onChange={e => setEditingSocial({...editingSocial, icon: e.target.value})}><option value="instagram">Instagram</option><option value="telegram">Telegram</option><option value="whatsapp">WhatsApp</option><option value="twitter">X</option><option value="youtube">YouTube</option></select>
+            <div className="flex gap-3 pt-4"><button type="button" onClick={() => setEditingSocial(null)} className="flex-1 py-4 bg-white/5 rounded-2xl font-black uppercase text-[10px]">Cancelar</button><button type="submit" className="flex-[2] py-4 bg-yellow-500 text-black rounded-2xl font-black uppercase text-[10px]">Salvar</button></div>
           </form>
         </div>
       )}
