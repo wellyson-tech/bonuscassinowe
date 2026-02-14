@@ -73,6 +73,7 @@ const AdminPanel: React.FC = () => {
       const base64 = await convertFileToBase64(file);
       if (type === 'logo') setBrand(prev => ({ ...prev, logoUrl: base64 }));
       else setBrand(prev => ({ ...prev, backgroundUrl: base64 }));
+      alert("Imagem carregada! Clique em Salvar Alterações.");
     } catch (error) { alert('Erro ao processar imagem'); } finally { setLoading(false); }
   };
 
@@ -88,7 +89,7 @@ const AdminPanel: React.FC = () => {
 
   const fetchSocials = async () => {
     const { data } = await supabase.from('social_links').select('*').order('position', { ascending: true });
-    if (data) setSocials(data);
+    if (data) setSocials(data as SocialLink[]);
   };
 
   const moveCategory = async (name: string, dir: 'left' | 'right') => {
@@ -127,7 +128,7 @@ const AdminPanel: React.FC = () => {
       background_url: brand.backgroundUrl, verified: brand.verified,
       footer_text: finalFooter, effect: brand.effect
     }).eq('id', 1);
-    alert("Marca salva!");
+    alert("Identidade Visual Atualizada!");
     setLoading(false);
   };
 
@@ -162,53 +163,71 @@ const AdminPanel: React.FC = () => {
   }, [links, pagesOrder]);
 
   return (
-    <div className="w-full max-w-5xl mx-auto p-4 md:p-10 bg-[#050505] min-h-screen text-white pb-32">
+    <div className="w-full max-w-5xl mx-auto p-4 md:p-10 bg-[#050505] min-h-screen text-white pb-32 font-sans">
       {loading && <div className="fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center font-black uppercase text-yellow-500 tracking-widest animate-pulse">Sincronizando...</div>}
       
       <div className="flex justify-between items-center mb-10 border-b border-white/5 pb-8">
-        <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter">CONTROLE MASTER 3.0</h2>
-        <button onClick={() => { supabase.auth.signOut(); window.location.hash = '#/'; window.location.reload(); }} className="px-6 py-2 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl text-[9px] font-black uppercase">Sair</button>
+        <div>
+          <h2 className="text-2xl font-black text-shimmer uppercase italic tracking-tighter">CONTROLE MASTER 3.0</h2>
+          <p className="text-[9px] text-gray-500 uppercase font-black">Gerencie sua sala VIP e links principais</p>
+        </div>
+        <div className="flex gap-3">
+          <a href="#/roleta" target="_blank" className="px-6 py-2 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-xl text-[9px] font-black uppercase hover:bg-purple-500 hover:text-white transition-all">Ver Sala Roleta</a>
+          <button onClick={() => { supabase.auth.signOut(); window.location.hash = '#/'; window.location.reload(); }} className="px-6 py-2 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl text-[9px] font-black uppercase">Sair</button>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-3 mb-12">
         {(['links', 'social', 'brand'] as const).map(m => (
           <button key={m} onClick={() => setActiveMenu(m)} className={`py-5 rounded-[1.8rem] text-[10px] font-black uppercase border transition-all ${activeMenu === m ? 'bg-yellow-500 text-black border-yellow-500 shadow-lg' : 'bg-white/5 text-gray-400 border-white/5'}`}>
-            {m === 'links' ? '🎰 Links' : m === 'social' ? '📱 Social' : '🎨 Estilo'}
+            {m === 'links' ? '🎰 Meus Links' : m === 'social' ? '📱 Social' : '🎨 Estilo'}
           </button>
         ))}
       </div>
 
       {activeMenu === 'brand' && (
-        <form onSubmit={handleSaveBrand} className="bg-[#0f0f0f] p-8 rounded-[3rem] border border-white/5 space-y-8">
+        <form onSubmit={handleSaveBrand} className="bg-[#0f0f0f] p-8 rounded-[3rem] border border-white/5 space-y-8 animate-fade-in">
           <div className="grid md:grid-cols-2 gap-8">
             <div className="p-6 bg-black rounded-[2rem] border border-white/5 flex items-center gap-4">
               <img src={brand.logoUrl} className="w-16 h-16 rounded-full object-cover border-2 border-yellow-500" />
-              <button type="button" onClick={() => logoInputRef.current?.click()} className="flex-1 py-3 bg-white/5 rounded-xl text-[9px] font-black uppercase">Alterar Logo</button>
+              <button type="button" onClick={() => logoInputRef.current?.click()} className="flex-1 py-3 bg-white/5 rounded-xl text-[9px] font-black uppercase">Mudar Logo</button>
               <input type="file" ref={logoInputRef} onChange={e => handleFileUpload(e, 'logo')} className="hidden" />
             </div>
             <div className="p-6 bg-black rounded-[2rem] border border-white/5 flex items-center gap-4">
-              <div className="w-16 h-16 bg-white/5 rounded-xl border border-white/10 flex items-center justify-center">
-                {brand.backgroundUrl ? <img src={brand.backgroundUrl} className="w-full h-full object-cover" /> : <span className="text-[8px]">SEM FUNDO</span>}
+              <div className="w-16 h-16 bg-white/5 rounded-xl border border-white/10 flex items-center justify-center overflow-hidden">
+                {brand.backgroundUrl ? <img src={brand.backgroundUrl} className="w-full h-full object-cover" /> : <span className="text-[8px] text-gray-500">SEM FUNDO</span>}
               </div>
-              <button type="button" onClick={() => bgInputRef.current?.click()} className="flex-1 py-3 bg-white/5 rounded-xl text-[9px] font-black uppercase">Alterar Fundo</button>
+              <button type="button" onClick={() => bgInputRef.current?.click()} className="flex-1 py-3 bg-white/5 rounded-xl text-[9px] font-black uppercase">Mudar Fundo</button>
               <input type="file" ref={bgInputRef} onChange={e => handleFileUpload(e, 'bg')} className="hidden" />
             </div>
           </div>
           <div className="grid md:grid-cols-2 gap-6">
-            <input className="bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" placeholder="Nome" value={brand.name} onChange={e => setBrand({...brand, name: e.target.value})} />
-            <input className="bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" placeholder="Slogan" value={brand.tagline} onChange={e => setBrand({...brand, tagline: e.target.value})} />
-            <select className="bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" value={brand.effect} onChange={e => setBrand({...brand, effect: e.target.value as any})}>
-              <option value="scanner">Scanner Gold</option><option value="gold-rain">Chuva de Ouro</option><option value="matrix">Matrix</option><option value="fire">Fire Ember</option><option value="money">Money Rain</option><option value="space">Space Stars</option><option value="aurora">Aurora</option><option value="glitch">Glitch</option><option value="confetti">Confetti</option><option value="snow">Snow</option><option value="lightning">Lightning</option><option value="none">Nenhum</option>
-            </select>
-            <input className="bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" placeholder="Rodapé" value={brand.footerText?.split('ORDER:')[0] || ''} onChange={e => setBrand({...brand, footerText: e.target.value})} />
+            <div className="space-y-1">
+              <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Nome da Marca</label>
+              <input className="w-full bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" value={brand.name} onChange={e => setBrand({...brand, name: e.target.value})} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Slogan</label>
+              <input className="w-full bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" value={brand.tagline} onChange={e => setBrand({...brand, tagline: e.target.value})} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Efeito de Fundo</label>
+              <select className="w-full bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" value={brand.effect} onChange={e => setBrand({...brand, effect: e.target.value as any})}>
+                <option value="scanner">Scanner Gold</option><option value="gold-rain">Chuva de Ouro</option><option value="matrix">Matrix</option><option value="fire">Fire Ember</option><option value="money">Money Rain</option><option value="space">Space Stars</option><option value="aurora">Aurora</option><option value="glitch">Glitch</option><option value="confetti">Confetti</option><option value="snow">Snow</option><option value="lightning">Lightning</option><option value="none">Nenhum</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Texto Rodapé</label>
+              <input className="w-full bg-black p-5 rounded-2xl border border-white/10 outline-none text-sm" value={brand.footerText?.split('ORDER:')[0] || ''} onChange={e => setBrand({...brand, footerText: e.target.value})} />
+            </div>
           </div>
-          <button type="submit" className="w-full py-6 bg-yellow-500 text-black font-black rounded-3xl uppercase text-xs">Salvar Alterações</button>
+          <button type="submit" className="w-full py-6 bg-yellow-500 text-black font-black rounded-3xl uppercase text-xs shadow-2xl hover:scale-[1.01] transition-all">Salvar Identidade Visual</button>
         </form>
       )}
 
       {activeMenu === 'links' && (
         <div className="space-y-8 animate-fade-in">
-          <div className="flex flex-wrap gap-2 p-4 bg-white/5 border border-white/5 rounded-[2.5rem]">
+          <div className="flex flex-wrap gap-2 p-4 bg-white/5 border border-white/5 rounded-[2.5rem] items-center">
             {sortedCategories.map((c, i) => (
               <div key={c} className={`flex items-center rounded-full border border-white/10 overflow-hidden ${activeAdminPage === c ? 'bg-white text-black' : 'bg-black/40 text-gray-400'}`}>
                 <button onClick={() => setActiveAdminPage(c)} className="px-6 py-3 text-[9px] font-black uppercase">{c}</button>
@@ -216,20 +235,53 @@ const AdminPanel: React.FC = () => {
                 <button onClick={() => moveCategory(c, 'right')} className="px-3 border-l border-white/10 hover:text-yellow-500 text-xs">→</button>
               </div>
             ))}
-            <button onClick={() => { const n = prompt("Nova página:"); if(n) setActiveAdminPage(n.trim()); }} className="px-4 py-3 text-yellow-500 text-[9px] font-black uppercase">+ Página</button>
+            <button onClick={() => { const n = prompt("Nova página (Dica: Use 'Roleta' para a sala VIP):"); if(n) setActiveAdminPage(n.trim()); }} className="px-4 py-3 text-yellow-500 text-[9px] font-black uppercase tracking-widest">+ Nova Página</button>
           </div>
-          <button onClick={() => setEditingLink({ category: activeAdminPage, type: 'glass', icon: 'auto' })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-3xl uppercase text-xs">+ Adicionar Link</button>
+          
+          <button onClick={() => setEditingLink({ category: activeAdminPage, type: 'glass', icon: 'auto' })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-3xl uppercase text-xs shadow-2xl">+ Adicionar Link em "{activeAdminPage}"</button>
+          
           <div className="space-y-4">
             {links.filter(l => (l.category || 'Página 1').trim() === activeAdminPage.trim()).sort((a,b) => a.position - b.position).map((l, i) => (
-              <div key={l.id} className="bg-[#0f0f0f] p-5 rounded-[2rem] flex items-center justify-between border border-white/5">
+              <div key={l.id} className="bg-[#0f0f0f] p-5 rounded-[2rem] flex items-center justify-between border border-white/5 group">
                 <div className="flex items-center gap-4">
-                  <input type="number" defaultValue={i+1} onBlur={e => jumpToPosition(l.id!, parseInt(e.target.value))} className="w-10 h-10 bg-black border border-white/10 rounded-lg text-center text-xs font-black" />
-                  <div className="w-10 h-10 bg-black rounded-lg border border-white/10 flex items-center justify-center">{Icons[l.icon || 'slots']}</div>
-                  <div><h4 className="font-bold text-sm uppercase">{l.title}</h4><p className="text-[8px] text-gray-500 uppercase">{l.click_count || 0} CLIQUES</p></div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-[7px] text-gray-500 font-black uppercase">Pos</span>
+                    <input type="number" defaultValue={i+1} onBlur={e => jumpToPosition(l.id!, parseInt(e.target.value))} className="w-10 h-10 bg-black border border-white/10 rounded-lg text-center text-xs font-black" />
+                  </div>
+                  <div className="w-12 h-12 bg-black rounded-xl border border-white/10 flex items-center justify-center text-yellow-500">{Icons[l.icon || 'slots'] || Icons.slots}</div>
+                  <div>
+                    <h4 className="font-bold text-sm uppercase flex items-center gap-2">{l.title}{l.badge && <span className="text-[7px] bg-yellow-500 text-black px-1 py-0.5 rounded">{l.badge}</span>}</h4>
+                    <p className="text-[8px] text-gray-500 uppercase">{l.click_count || 0} CLIQUES • ESTILO: {l.type}</p>
+                  </div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => setEditingLink(l)} className="p-3 bg-white/5 rounded-xl">⚙️</button>
-                  <button onClick={() => handleDelete('links', l.id!)} className="p-3 bg-red-500/10 text-red-500 rounded-xl">🗑️</button>
+                  <button onClick={() => setEditingLink(l)} className="p-3 bg-white/5 rounded-xl hover:bg-white/10">⚙️</button>
+                  <button onClick={() => handleDelete('links', l.id!)} className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-white">🗑️</button>
+                </div>
+              </div>
+            ))}
+            {links.filter(l => (l.category || 'Página 1').trim() === activeAdminPage.trim()).length === 0 && (
+              <div className="py-20 text-center border-2 border-dashed border-white/5 rounded-[2rem]">
+                <p className="text-gray-600 font-black uppercase text-[10px]">Nenhum link nesta página</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeMenu === 'social' && (
+        <div className="space-y-6 animate-fade-in">
+          <button onClick={() => setEditingSocial({ name: '', url: '', icon: 'instagram' })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-3xl uppercase text-xs shadow-2xl">+ Adicionar Rede Social</button>
+          <div className="grid grid-cols-1 gap-4">
+            {socials.map(s => (
+              <div key={s.id} className="bg-[#0f0f0f] p-5 rounded-[2rem] flex items-center justify-between border border-white/5">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-black rounded-xl border border-white/10 flex items-center justify-center">{Icons[s.icon] || s.name.charAt(0)}</div>
+                  <h4 className="font-bold text-sm uppercase">{s.name}</h4>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setEditingSocial(s)} className="p-3 bg-white/5 rounded-xl hover:bg-white/10">⚙️</button>
+                  <button onClick={() => handleDelete('social_links', s.id!)} className="p-3 bg-red-500/10 text-red-500 rounded-xl">🗑️</button>
                 </div>
               </div>
             ))}
@@ -237,51 +289,57 @@ const AdminPanel: React.FC = () => {
         </div>
       )}
 
-      {activeMenu === 'social' && (
-        <div className="space-y-6 animate-fade-in">
-          <button onClick={() => setEditingSocial({ name: '', url: '', icon: 'instagram' })} className="w-full py-6 bg-yellow-500 text-black font-black rounded-3xl uppercase text-xs">+ Adicionar Rede</button>
-          {socials.map(s => (
-            <div key={s.id} className="bg-[#0f0f0f] p-5 rounded-[2rem] flex items-center justify-between border border-white/5">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-black rounded-lg border border-white/10 flex items-center justify-center">{Icons[s.icon]}</div>
-                <h4 className="font-bold text-sm uppercase">{s.name}</h4>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => setEditingSocial(s)} className="p-3 bg-white/5 rounded-xl">⚙️</button>
-                <button onClick={() => handleDelete('social_links', s.id!)} className="p-3 bg-red-500/10 text-red-500 rounded-xl">🗑️</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
       {editingLink && (
-        <div className="fixed inset-0 bg-black/95 z-[10000] flex items-center justify-center p-4 overflow-y-auto">
-          <form onSubmit={handleSaveLink} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-xl space-y-5">
-            <h3 className="text-xl font-black uppercase text-yellow-500 italic">Configurar Link</h3>
+        <div className="fixed inset-0 bg-black/95 z-[10000] flex items-center justify-center p-4 overflow-y-auto backdrop-blur-sm">
+          <form onSubmit={handleSaveLink} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-xl space-y-5 shadow-2xl my-auto">
+            <h3 className="text-xl font-black uppercase text-yellow-500 italic mb-4">Configurar Link</h3>
             <div className="grid grid-cols-2 gap-4">
-              <input className="bg-black p-4 rounded-xl text-sm border border-white/10" placeholder="Título" value={editingLink.title || ''} onChange={e => setEditingLink({...editingLink, title: e.target.value})} required />
-              <input className="bg-black p-4 rounded-xl text-sm border border-white/10" placeholder="Página (ex: Roleta)" value={editingLink.category || ''} onChange={e => setEditingLink({...editingLink, category: e.target.value})} required />
+              <div className="space-y-1">
+                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Título</label>
+                <input className="w-full bg-black p-4 rounded-xl text-sm border border-white/10 focus:border-yellow-500 outline-none" value={editingLink.title || ''} onChange={e => setEditingLink({...editingLink, title: e.target.value})} required />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Categoria/Página</label>
+                <input className="w-full bg-black p-4 rounded-xl text-sm border border-white/10 focus:border-yellow-500 outline-none" value={editingLink.category || ''} onChange={e => setEditingLink({...editingLink, category: e.target.value})} required />
+              </div>
             </div>
-            <input className="w-full bg-black p-4 rounded-xl text-sm border border-white/10" placeholder="Descrição" value={editingLink.description || ''} onChange={e => setEditingLink({...editingLink, description: e.target.value})} />
-            <input className="w-full bg-black p-4 rounded-xl text-sm border border-white/10" placeholder="URL Destino" value={editingLink.url || ''} onChange={e => setEditingLink({...editingLink, url: e.target.value})} required />
+            <div className="space-y-1">
+              <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Descrição</label>
+              <input className="w-full bg-black p-4 rounded-xl text-sm border border-white/10 focus:border-yellow-500 outline-none" value={editingLink.description || ''} onChange={e => setEditingLink({...editingLink, description: e.target.value})} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[8px] uppercase font-black text-gray-500 ml-1">URL de Destino</label>
+              <input className="w-full bg-black p-4 rounded-xl text-sm border border-white/10 focus:border-yellow-500 outline-none" value={editingLink.url || ''} onChange={e => setEditingLink({...editingLink, url: e.target.value})} required />
+            </div>
             <div className="grid grid-cols-3 gap-4">
-              <select className="bg-black p-4 rounded-xl text-xs border border-white/10" value={editingLink.type} onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}><option value="glass">Glass</option><option value="gold">Gold</option><option value="neon-purple">Neon P.</option><option value="neon-green">Neon G.</option></select>
-              <select className="bg-black p-4 rounded-xl text-xs border border-white/10" value={editingLink.icon} onChange={e => setEditingLink({...editingLink, icon: e.target.value})}><option value="auto">Auto</option>{Object.keys(Icons).map(k => <option key={k} value={k}>{k}</option>)}</select>
-              <input className="bg-black p-4 rounded-xl text-xs border border-white/10" placeholder="Badge" value={editingLink.badge || ''} onChange={e => setEditingLink({...editingLink, badge: e.target.value.toUpperCase()})} />
+              <div className="space-y-1">
+                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Estilo</label>
+                <select className="w-full bg-black p-4 rounded-xl text-xs border border-white/10" value={editingLink.type} onChange={e => setEditingLink({...editingLink, type: e.target.value as any})}><option value="glass">Glass</option><option value="gold">Gold</option><option value="neon-purple">Neon Purple</option><option value="neon-green">Neon Green</option></select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Ícone</label>
+                <select className="w-full bg-black p-4 rounded-xl text-xs border border-white/10" value={editingLink.icon} onChange={e => setEditingLink({...editingLink, icon: e.target.value})}><option value="auto">Auto (Favicon)</option>{Object.keys(Icons).map(k => <option key={k} value={k}>{k}</option>)}</select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[8px] uppercase font-black text-gray-500 ml-1">Badge</label>
+                <input className="w-full bg-black p-4 rounded-xl text-xs border border-white/10" value={editingLink.badge || ''} onChange={e => setEditingLink({...editingLink, badge: e.target.value.toUpperCase()})} placeholder="EX: BÔNUS" />
+              </div>
             </div>
-            <div className="flex gap-3 pt-4"><button type="button" onClick={() => setEditingLink(null)} className="flex-1 py-4 bg-white/5 rounded-2xl font-black uppercase text-[10px]">Cancelar</button><button type="submit" className="flex-[2] py-4 bg-yellow-500 text-black rounded-2xl font-black uppercase text-[10px]">Salvar Link</button></div>
+            <div className="flex gap-3 pt-6 border-t border-white/5">
+              <button type="button" onClick={() => setEditingLink(null)} className="flex-1 py-4 bg-white/5 rounded-2xl font-black uppercase text-[10px]">Cancelar</button>
+              <button type="submit" className="flex-[2] py-4 bg-yellow-500 text-black rounded-2xl font-black uppercase text-[10px]">Confirmar Alterações</button>
+            </div>
           </form>
         </div>
       )}
 
       {editingSocial && (
         <div className="fixed inset-0 bg-black/95 z-[10000] flex items-center justify-center p-4">
-          <form onSubmit={e => { e.preventDefault(); setLoading(true); const p = {...editingSocial}; delete (p as any).id; if(editingSocial.id) supabase.from('social_links').update(p).eq('id', editingSocial.id).then(()=>fetchSocials().then(()=>setEditingSocial(null))); else supabase.from('social_links').insert([p]).then(()=>fetchSocials().then(()=>setEditingSocial(null))); setLoading(false); }} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-md space-y-5">
+          <form onSubmit={e => { e.preventDefault(); setLoading(true); const p = {...editingSocial}; delete (p as any).id; if(editingSocial.id) supabase.from('social_links').update(p).eq('id', editingSocial.id).then(()=>fetchSocials().then(()=>setEditingSocial(null))); else supabase.from('social_links').insert([p]).then(()=>fetchSocials().then(()=>setEditingSocial(null))); setLoading(false); }} className="bg-[#0a0a0a] border border-white/10 p-8 rounded-[3rem] w-full max-w-md space-y-5 shadow-2xl">
             <h3 className="text-xl font-black uppercase text-yellow-500 italic">Rede Social</h3>
             <input className="w-full bg-black p-4 rounded-xl border border-white/10" placeholder="Nome" value={editingSocial.name || ''} onChange={e => setEditingSocial({...editingSocial, name: e.target.value})} required />
-            <input className="w-full bg-black p-4 rounded-xl border border-white/10" placeholder="URL" value={editingSocial.url || ''} onChange={e => setEditingSocial({...editingSocial, url: e.target.value})} required />
-            <select className="w-full bg-black p-4 rounded-xl border border-white/10" value={editingSocial.icon} onChange={e => setEditingSocial({...editingSocial, icon: e.target.value})}><option value="instagram">Instagram</option><option value="telegram">Telegram</option><option value="whatsapp">WhatsApp</option><option value="twitter">X</option><option value="youtube">YouTube</option></select>
+            <input className="w-full bg-black p-4 rounded-xl border border-white/10" placeholder="URL Perfil" value={editingSocial.url || ''} onChange={e => setEditingSocial({...editingSocial, url: e.target.value})} required />
+            <select className="w-full bg-black p-4 rounded-xl border border-white/10" value={editingSocial.icon} onChange={e => setEditingSocial({...editingSocial, icon: e.target.value})}><option value="instagram">Instagram</option><option value="telegram">Telegram</option><option value="whatsapp">WhatsApp</option><option value="twitter">X (Twitter)</option><option value="youtube">YouTube</option></select>
             <div className="flex gap-3 pt-4"><button type="button" onClick={() => setEditingSocial(null)} className="flex-1 py-4 bg-white/5 rounded-2xl font-black uppercase text-[10px]">Cancelar</button><button type="submit" className="flex-[2] py-4 bg-yellow-500 text-black rounded-2xl font-black uppercase text-[10px]">Salvar Rede</button></div>
           </form>
         </div>

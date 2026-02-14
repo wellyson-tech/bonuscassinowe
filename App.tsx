@@ -80,19 +80,19 @@ const App: React.FC = () => {
 
   const fetchLinks = async () => {
     const { data } = await supabase.from('links').select('*').order('position', { ascending: true });
-    if (data) setLinks(data);
+    if (data) setLinks(data as CasinoLink[]);
   };
 
   const fetchSocials = async () => {
     const { data } = await supabase.from('social_links').select('*').order('position', { ascending: true });
-    if (data) setSocials(data);
+    if (data) setSocials(data as SocialLink[]);
   };
 
-  // Categorias para a Home (exclui Roleta)
   const categories = useMemo(() => {
     const foundCats: string[] = [];
     links.forEach(l => {
       const name = (l.category || 'Página 1').trim();
+      // A categoria "Roleta" é oculta da navegação principal, acessada apenas pelo link direto
       if (name.toLowerCase() !== 'roleta' && !foundCats.includes(name)) foundCats.push(name);
     });
     const ordered = pagesOrder.filter(c => foundCats.includes(c));
@@ -107,7 +107,6 @@ const App: React.FC = () => {
     return links.filter(l => (l.category || 'Página 1').trim() === target.trim() && (l.category || '').toLowerCase() !== 'roleta');
   }, [links, activeCategory, categories]);
 
-  // Links específicos para a Roleta
   const roletaLinks = useMemo(() => {
     return links.filter(l => (l.category || '').toLowerCase() === 'roleta');
   }, [links]);
@@ -118,23 +117,23 @@ const App: React.FC = () => {
       <div className="effect-container fixed inset-0 pointer-events-none z-0">
         <div className="absolute inset-0 bg-black -z-30" />
         {brand.backgroundUrl && (
-          <div className="absolute inset-0 -z-20 bg-cover bg-center bg-no-repeat opacity-40" 
-               style={{ backgroundImage: `url(${brand.backgroundUrl})` }} />
+          <div className="absolute inset-0 -z-20 bg-cover bg-center bg-no-repeat opacity-40 transition-opacity duration-1000" 
+               style={{ backgroundImage: `url(${brand.backgroundUrl})`, backgroundAttachment: 'fixed' }} />
         )}
         
-        {/* Renderização das partículas */}
-        {effect === 'scanner' && <div className={`scanner-beam ${isRoleta ? 'opacity-40' : 'opacity-10'}`} style={isRoleta ? { background: 'linear-gradient(110deg, transparent, rgba(168, 85, 247, 0.2) 50%, transparent)' } : {}} />}
+        {/* Renderização dinâmica dos elementos do CSS */}
+        {effect === 'scanner' && <div className="scanner-beam" style={isRoleta ? { background: 'linear-gradient(110deg, transparent, rgba(168, 85, 247, 0.15) 50%, transparent)' } : {}} />}
         
         {effect === 'gold-rain' && Array.from({ length: 30 }).map((_, i) => (
           <div key={i} className="gold-particle" style={{ left: `${Math.random() * 100}%`, animationDuration: `${2 + Math.random() * 3}s`, animationDelay: `${Math.random() * 5}s` }} />
         ))}
 
         {effect === 'fire' && Array.from({ length: 40 }).map((_, i) => (
-          <div key={i} className="fire-ember" style={{ left: `${Math.random() * 100}%`, animationDuration: `${2 + Math.random() * 4}s`, animationDelay: `${Math.random() * 3}s` }} />
+          <div key={i} className="fire-ember" style={{ left: `${Math.random() * 100}%`, animationDuration: `${2 + Math.random() * 4}s`, animationDelay: `${Math.random() * 3}s`, width: `${2 + Math.random() * 4}px`, height: `${2 + Math.random() * 4}px` }} />
         ))}
 
         {effect === 'money' && Array.from({ length: 15 }).map((_, i) => (
-          <div key={i} className="money-item" style={{ left: `${Math.random() * 100}%`, animationDuration: `${4 + Math.random() * 4}s`, animationDelay: `${Math.random() * 8}s` }}>{['💵','💰','💎'][Math.floor(Math.random()*3)]}</div>
+          <div key={i} className="money-item" style={{ left: `${Math.random() * 100}%`, animationDuration: `${3 + Math.random() * 5}s`, animationDelay: `${Math.random() * 8}s` }}>{['💵','💰','💎'][Math.floor(Math.random()*3)]}</div>
         ))}
 
         {effect === 'space' && Array.from({ length: 60 }).map((_, i) => (
@@ -143,8 +142,11 @@ const App: React.FC = () => {
 
         {effect === 'aurora' && <div className="aurora-layer" />}
         {effect === 'lightning' && <div className="lightning-flash animate-lightning" />}
+        {effect === 'glitch' && Array.from({ length: 10 }).map((_, i) => (
+          <div key={i} className="glitch-line" style={{ top: `${Math.random() * 100}%`, animationDelay: `${Math.random() * 2}s` }} />
+        ))}
         {effect === 'confetti' && Array.from({ length: 30 }).map((_, i) => (
-          <div key={i} className="confetti" style={{ left: `${Math.random() * 100}%`, backgroundColor: ['#fccd4d','#a855f7','#fff'][Math.floor(Math.random()*3)], animationDuration: `${3 + Math.random() * 3}s` }} />
+          <div key={i} className="confetti" style={{ left: `${Math.random() * 100}%`, backgroundColor: ['#fccd4d','#a855f7','#fff'][Math.floor(Math.random()*3)], animationDuration: `${2 + Math.random() * 4}s` }} />
         ))}
 
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/90 -z-10" />
@@ -160,35 +162,32 @@ const App: React.FC = () => {
       window.location.hash = '#/admin-secret';
       setView('admin');
     } else {
-      setLoginError('Acesso Negado');
+      setLoginError('Credenciais inválidas');
     }
     setLoginLoading(false);
   };
 
   if (initializing) return null;
 
-  // Renderização do Painel Admin
   if (view === 'admin') return <AdminPanel />;
 
-  // Renderização do Login Admin
   if (view === 'login') {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-black relative overflow-hidden">
         <BackgroundElements />
         <div className="w-full max-w-sm glass-card p-10 rounded-[3.5rem] text-center z-10 border border-white/10 shadow-2xl">
-          <h2 className="text-3xl font-black uppercase text-shimmer tracking-tighter italic mb-10">Admin Login</h2>
+          <h2 className="text-3xl font-black uppercase text-shimmer tracking-tighter italic mb-10">Acesso Restrito</h2>
           <form onSubmit={handleLogin} className="space-y-5">
             <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white outline-none focus:border-yellow-500" placeholder="E-mail" />
             <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl text-white outline-none focus:border-yellow-500 font-mono" placeholder="Senha" />
             {loginError && <p className="text-[10px] text-red-500 uppercase font-black">{loginError}</p>}
-            <button type="submit" disabled={loginLoading} className="w-full py-5 bg-yellow-500 text-black font-black rounded-2xl uppercase text-[11px] tracking-widest">{loginLoading ? 'Carregando...' : 'Entrar'}</button>
+            <button type="submit" disabled={loginLoading} className="w-full py-5 bg-yellow-500 text-black font-black rounded-2xl uppercase text-[11px] tracking-widest">{loginLoading ? 'Verificando...' : 'Entrar'}</button>
           </form>
         </div>
       </div>
     );
   }
 
-  // Renderização da Sala VIP Roleta
   if (view === 'roleta') {
     return (
       <div className="min-h-screen bg-black text-white relative font-sans overflow-x-hidden pb-20">
@@ -213,7 +212,7 @@ const App: React.FC = () => {
               roletaLinks.map(link => <LinkButton key={link.id} link={link} />)
             ) : (
               <div className="glass-card p-10 rounded-[2rem] text-center border-dashed border-white/10 w-full">
-                <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Nenhuma mesa disponível no momento</p>
+                <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Nenhuma mesa disponível</p>
               </div>
             )}
           </div>
@@ -227,7 +226,6 @@ const App: React.FC = () => {
     );
   }
 
-  // Renderização da Página Principal (Home)
   return (
     <div className="min-h-screen bg-black text-white relative font-sans overflow-x-hidden pb-20">
       <BackgroundElements />
