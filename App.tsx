@@ -14,7 +14,7 @@ const App: React.FC = () => {
     ...DEFAULT_BRAND,
     extraPages: {
       bonusaleatorio: { title: 'BÔNUS SURPRESA', tagline: 'OFERTAS ALEATÓRIAS DO DIA', effect: 'money', badge: 'OFERTA LIMITADA' },
-      cinco_bonus: { title: 'R$ 5,00 GRÁTIS', tagline: 'PLATAFORMAS PAGANDO AGORA', effect: 'scanner', badge: 'SAQUE IMEDIATO' }
+      cinco_bonus: { title: 'R$ 5,00 GRÁS', tagline: 'PLATAFORMAS PAGANDO AGORA', effect: 'scanner', badge: 'SAQUE IMEDIATO' }
     }
   });
   const [activeCategory, setActiveCategory] = useState<string>('');
@@ -46,8 +46,11 @@ const App: React.FC = () => {
     const { data: { session } } = await supabase.auth.getSession();
     
     if (currentPath.includes('admin-secret')) {
-      if (session && session.user.id === ADMIN_UID) setView('admin');
-      else setView('login');
+      if (session && session.user.id === ADMIN_UID) {
+        setView('admin');
+      } else {
+        setView('login');
+      }
     } else if (currentPath === '/roleta') {
       setView('roleta');
     } else if (currentPath === '/bonusaleatorio') {
@@ -62,13 +65,22 @@ const App: React.FC = () => {
   useEffect(() => {
     const initApp = async () => {
       try {
+        // Observador de Auth para o Painel Admin não "sumir" após login
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (session?.user?.id === ADMIN_UID && window.location.pathname.includes('admin-secret')) {
+            setView('admin');
+          }
+        });
+
         await handleNavigation();
         await fetchBrand();
         await Promise.all([fetchLinks(), fetchSocials()]);
+        
+        return () => subscription.unsubscribe();
       } catch (e) {
         console.error("Erro na carga inicial:", e);
       } finally {
-        setInitializing(false);
+        setTimeout(() => setInitializing(false), 800); // Delay suave para o loader
       }
     };
     initApp();
@@ -197,25 +209,52 @@ const App: React.FC = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginLoading(true);
+    setLoginError(null);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (!error && data.user?.id === ADMIN_UID) navigateTo('/admin-secret');
-    else setLoginError('Acesso Negado');
+    
+    if (error) {
+      setLoginError(error.message === 'Invalid login credentials' ? 'Credenciais Inválidas' : error.message);
+    } else if (data.user?.id === ADMIN_UID) {
+      navigateTo('/admin-secret');
+    } else {
+      setLoginError('Acesso Restrito ao Proprietário');
+      await supabase.auth.signOut();
+    }
     setLoginLoading(false);
   };
 
-  if (initializing) return null;
+  // Loader de inicialização elegante
+  if (initializing) return (
+    <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-[9999]">
+      <div className="w-20 h-20 relative animate-float">
+        <img src={brand.logoUrl} className="w-full h-full rounded-full object-cover border-4 border-yellow-500 shadow-[0_0_30px_rgba(234,179,8,0.3)]" alt="Logo" />
+      </div>
+      <div className="mt-8 flex flex-col items-center gap-2">
+        <div className="w-32 h-1 bg-white/5 rounded-full overflow-hidden">
+          <div className="h-full bg-yellow-500 animate-[loading_1.5s_infinite_ease-in-out]"></div>
+        </div>
+        <p className="text-[8px] font-black uppercase tracking-[0.4em] text-yellow-500/50">Carregando Master</p>
+      </div>
+      <style>{`@keyframes loading { 0% { width: 0; transform: translateX(-100%); } 50% { width: 100%; transform: translateX(0); } 100% { width: 0; transform: translateX(100%); } }`}</style>
+    </div>
+  );
+
   if (view === 'admin') return <AdminPanel />;
+  
   if (view === 'login') return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-black relative">
       <BackgroundElements />
-      <div className="w-full max-w-sm glass-card p-10 rounded-[3.5rem] z-10 border border-white/10 text-center">
+      <div className="w-full max-w-sm glass-card p-10 rounded-[3.5rem] z-10 border border-white/10 text-center shadow-2xl">
         <h2 className="text-3xl font-black uppercase text-shimmer mb-10 italic">Acesso Admin</h2>
         <form onSubmit={handleLogin} className="space-y-4">
-          <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl outline-none focus:border-yellow-500 text-white" placeholder="E-mail" />
-          <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl outline-none focus:border-yellow-500 text-white" placeholder="Senha" />
-          {loginError && <p className="text-[10px] text-red-500 font-black uppercase">{loginError}</p>}
-          <button type="submit" disabled={loginLoading} className="w-full py-5 bg-yellow-500 text-black font-black rounded-2xl uppercase tracking-widest">{loginLoading ? 'CARREGANDO...' : 'ENTRAR'}</button>
+          <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl outline-none focus:border-yellow-500 text-white transition-all" placeholder="E-mail" />
+          <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full p-5 bg-black border border-white/10 rounded-2xl outline-none focus:border-yellow-500 text-white transition-all" placeholder="Senha" />
+          {loginError && <p className="text-[10px] text-red-500 font-black uppercase bg-red-500/10 py-2 rounded-lg">{loginError}</p>}
+          <button type="submit" disabled={loginLoading} className="w-full py-5 bg-yellow-500 text-black font-black rounded-2xl uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50">
+            {loginLoading ? 'VALIDANDO...' : 'ENTRAR'}
+          </button>
         </form>
+        <button onClick={() => navigateTo('/')} className="mt-8 text-[9px] font-black uppercase text-gray-500 hover:text-white transition-colors">Voltar para o Site</button>
       </div>
     </div>
   );
@@ -225,7 +264,7 @@ const App: React.FC = () => {
   if (view === '5debonus') return <CategoryPageView categoryName="5 de Bonus" {...brand.extraPages?.cinco_bonus} />;
 
   return (
-    <div className="min-h-screen bg-black text-white relative font-sans overflow-x-hidden pb-20">
+    <div className="min-h-screen bg-black text-white relative font-sans overflow-x-hidden pb-20 animate-fade-in">
       <BackgroundElements />
       <main className="relative z-10 max-w-lg mx-auto px-6 py-16 flex flex-col items-center">
         <header className="text-center mb-12 flex flex-col items-center">
