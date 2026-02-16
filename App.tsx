@@ -10,7 +10,13 @@ const App: React.FC = () => {
   const [view, setView] = useState<'public' | 'login' | 'admin' | 'roleta' | 'bonusaleatorio' | '5debonus'>('public');
   const [links, setLinks] = useState<CasinoLink[]>([]);
   const [socials, setSocials] = useState<SocialLink[]>([]);
-  const [brand, setBrand] = useState<CasinoBrand>(DEFAULT_BRAND);
+  const [brand, setBrand] = useState<CasinoBrand>({
+    ...DEFAULT_BRAND,
+    extraPages: {
+      bonusaleatorio: { title: 'BÔNUS SURPRESA', tagline: 'OFERTAS ALEATÓRIAS DO DIA', effect: 'money', badge: 'OFERTA LIMITADA' },
+      cinco_bonus: { title: 'R$ 5,00 GRÁTIS', tagline: 'PLATAFORMAS PAGANDO AGORA', effect: 'scanner', badge: 'SAQUE IMEDIATO' }
+    }
+  });
   const [activeCategory, setActiveCategory] = useState<string>('');
   const [initializing, setInitializing] = useState(true);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -61,6 +67,16 @@ const App: React.FC = () => {
     try {
       const { data, error } = await supabase.from('brand_settings').select('*').eq('id', 1).single();
       if (data && !error) {
+        let extraPages = brand.extraPages;
+        let footerRaw = data.footer_text || '';
+        
+        if (footerRaw.includes('EXTRAS:')) {
+          try {
+            const extraPart = footerRaw.split('EXTRAS:')[1].split('ORDER:')[0];
+            extraPages = JSON.parse(extraPart);
+          } catch(e) {}
+        }
+
         setBrand({
           name: data.name,
           tagline: data.tagline,
@@ -73,7 +89,8 @@ const App: React.FC = () => {
           roletaTagline: data.roleta_tagline || 'ROLETA ESTRATÉGICA',
           roletaLogoUrl: data.roleta_logo_url || data.logo_url,
           roletaEffect: data.roleta_effect || 'scanner',
-          roletaBadgeText: data.roleta_badge_text || 'Acesso Restrito VIP'
+          roletaBadgeText: data.roleta_badge_text || 'Acesso Restrito VIP',
+          extraPages: extraPages
         });
         
         if (data.footer_text && data.footer_text.includes('ORDER:')) {
@@ -102,7 +119,6 @@ const App: React.FC = () => {
     links.forEach(l => {
       const name = (l.category || 'Página 1').trim();
       const lowerName = name.toLowerCase();
-      // Filtrar categorias especiais da lista de tabs da home
       if (lowerName !== 'roleta' && lowerName !== 'bonus aleatorio' && lowerName !== '5 de bonus' && !foundCats.includes(name)) {
         foundCats.push(name);
       }
@@ -130,23 +146,18 @@ const App: React.FC = () => {
         )}
         
         {effect === 'scanner' && <div className="scanner-beam" />}
-        
         {effect === 'gold-rain' && Array.from({ length: 30 }).map((_, i) => (
           <div key={i} className="gold-particle" style={{ left: `${Math.random() * 100}%`, animationDuration: `${2 + Math.random() * 3}s`, animationDelay: `${Math.random() * 5}s` }} />
         ))}
-
         {effect === 'fire' && Array.from({ length: 40 }).map((_, i) => (
           <div key={i} className="fire-ember" style={{ left: `${Math.random() * 100}%`, animationDuration: `${2 + Math.random() * 4}s`, animationDelay: `${Math.random() * 3}s` }} />
         ))}
-
         {effect === 'money' && Array.from({ length: 15 }).map((_, i) => (
           <div key={i} className="money-item" style={{ left: `${Math.random() * 100}%`, animationDuration: `${3 + Math.random() * 5}s`, animationDelay: `${Math.random() * 8}s` }}>{['💵','💰','💎'][Math.floor(Math.random()*3)]}</div>
         ))}
-
         {effect === 'space' && Array.from({ length: 60 }).map((_, i) => (
           <div key={i} className="star" style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%`, animationDuration: `${3 + Math.random() * 8}s` }} />
         ))}
-
         {effect === 'aurora' && <div className="aurora-layer" />}
         {effect === 'lightning' && <div className="lightning-flash animate-lightning" />}
         {effect === 'glitch' && Array.from({ length: 10 }).map((_, i) => (
@@ -155,18 +166,17 @@ const App: React.FC = () => {
         {effect === 'confetti' && Array.from({ length: 30 }).map((_, i) => (
           <div key={i} className="confetti" style={{ left: `${Math.random() * 100}%`, backgroundColor: ['#fccd4d','#a855f7','#fff'][Math.floor(Math.random()*3)], animationDuration: `${2 + Math.random() * 4}s` }} />
         ))}
-
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/90 -z-10" />
       </div>
     );
   };
 
-  const CategoryPageView = ({ categoryName, title, tagline }: { categoryName: string, title?: string, tagline?: string }) => {
+  const CategoryPageView = ({ categoryName, title, tagline, effect, badge }: { categoryName: string, title?: string, tagline?: string, effect?: string, badge?: string }) => {
     const pageLinks = links.filter(l => (l.category || '').toLowerCase() === categoryName.toLowerCase());
     
     return (
       <div className="min-h-screen bg-black text-white relative font-sans overflow-x-hidden pb-20">
-        <BackgroundElements customEffect={brand.roletaEffect} />
+        <BackgroundElements customEffect={effect || brand.roletaEffect} />
         <div className="fixed inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-900/20 via-transparent to-transparent -z-5 pointer-events-none"></div>
         
         <main className="relative z-10 max-w-lg mx-auto px-6 py-16 flex flex-col items-center text-center">
@@ -178,7 +188,7 @@ const App: React.FC = () => {
               </div>
             </div>
             <div className="inline-block px-4 py-1 rounded-full border border-purple-500/30 bg-purple-500/10 text-purple-400 text-[9px] font-black uppercase tracking-[0.4em] mb-4">
-              {brand.roletaBadgeText || 'Acesso Restrito'}
+              {badge || brand.roletaBadgeText || 'Acesso Restrito'}
             </div>
             <h1 className="text-5xl font-black uppercase italic tracking-tighter text-shimmer leading-none mb-2">
               {title || brand.roletaTitle}
@@ -193,19 +203,17 @@ const App: React.FC = () => {
               pageLinks.map(link => <LinkButton key={link.id} link={link} />)
             ) : (
               <div className="glass-card p-10 rounded-[2rem] text-center border-dashed border-white/10 w-full">
-                <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Nenhuma oferta disponível</p>
-                <p className="text-[8px] mt-2 opacity-30">Crie links no admin com a categoria "{categoryName}"</p>
+                <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Sem ofertas</p>
+                <p className="text-[8px] mt-2 opacity-30">Configure links na categoria "{categoryName}"</p>
               </div>
             )}
           </div>
 
-          {/* BOTÃO VOLTAR FLUTUANTE NO CANTO DIREITO INFERIOR */}
           <button 
             onClick={() => { window.location.hash = '#/'; setView('public'); }} 
             className="fixed bottom-6 right-6 z-[100] w-14 h-14 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 text-white rounded-full flex items-center justify-center shadow-[0_10px_30px_rgba(0,0,0,0.5)] transition-all active:scale-90 group"
-            title="Voltar para Início"
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="group-hover:-translate-x-0.5 transition-transform"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
           </button>
         </main>
       </div>
@@ -226,11 +234,8 @@ const App: React.FC = () => {
   };
 
   if (initializing) return null;
-
   if (view === 'admin') return <AdminPanel />;
-
-  if (view === 'login') {
-    return (
+  if (view === 'login') return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-black relative overflow-hidden">
         <BackgroundElements />
         <div className="w-full max-w-sm glass-card p-10 rounded-[3.5rem] text-center z-10 border border-white/10 shadow-2xl">
@@ -243,19 +248,18 @@ const App: React.FC = () => {
           </form>
         </div>
       </div>
-    );
-  }
+  );
 
-  if (view === 'roleta') {
-    return <CategoryPageView categoryName="Roleta" />;
-  }
-
+  if (view === 'roleta') return <CategoryPageView categoryName="Roleta" />;
+  
   if (view === 'bonusaleatorio') {
-    return <CategoryPageView categoryName="Bonus Aleatorio" title="BÔNUS SURPRESA" tagline="OFERTAS ALEATÓRIAS DO DIA" />;
+    const cfg = brand.extraPages?.bonusaleatorio;
+    return <CategoryPageView categoryName="Bonus Aleatorio" title={cfg?.title} tagline={cfg?.tagline} effect={cfg?.effect} badge={cfg?.badge} />;
   }
 
   if (view === '5debonus') {
-    return <CategoryPageView categoryName="5 de Bonus" title="R$ 5,00 GRÁTIS" tagline="PLATAFORMAS PAGANDO AGORA" />;
+    const cfg = brand.extraPages?.cinco_bonus;
+    return <CategoryPageView categoryName="5 de Bonus" title={cfg?.title} tagline={cfg?.tagline} effect={cfg?.effect} badge={cfg?.badge} />;
   }
 
   return (
@@ -295,34 +299,13 @@ const App: React.FC = () => {
         )}
 
         <div className={`w-full space-y-6 mb-16 transition-all duration-300 min-h-[400px] ${isTransitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
-          {/* BOTÃO ESPECIAL SALA VIP - APENAS EM 'LISTAS' */}
           {activeCategory.trim().toLowerCase() === 'listas' && (
-            <a
-              href="#/roleta"
-              onClick={(e) => { e.preventDefault(); window.location.hash = '#/roleta'; setView('roleta'); }}
-              className="relative w-full p-5 rounded-[2.2rem] flex items-center gap-5 group overflow-hidden border-b-[6px] neon-purple-btn text-purple-100 transform hover:scale-[1.03] transition-all duration-300 shadow-xl"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none" />
-              <div className="flex-shrink-0 z-10 group-hover:rotate-6 transition-transform duration-500">
-                <div className="relative w-12 h-12 flex items-center justify-center rounded-2xl p-1 bg-white/5 border border-white/10 overflow-hidden shadow-inner">
-                  <img src={brand.logoUrl} className="w-full h-full object-cover rounded-xl" alt="Logo" />
-                </div>
-              </div>
-              <div className="flex-grow text-left z-10">
-                <h3 className="text-[16px] font-black uppercase tracking-tight leading-tight">{brand.roletaTitle}</h3>
-                <p className="text-[12px] font-medium mt-1 line-clamp-1 opacity-60 text-gray-400">
-                  {brand.roletaTagline}
-                </p>
-              </div>
-              <div className="flex-shrink-0 z-10 opacity-30 group-hover:opacity-100 transition-all transform group-hover:translate-x-2">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 5l7 7-7 7" />
-                </svg>
-              </div>
+            <a href="#/roleta" onClick={(e) => { e.preventDefault(); window.location.hash = '#/roleta'; setView('roleta'); }} className="relative w-full p-5 rounded-[2.2rem] flex items-center gap-5 group overflow-hidden border-b-[6px] neon-purple-btn text-purple-100 transform hover:scale-[1.03] transition-all duration-300 shadow-xl">
+              <div className="flex-shrink-0 z-10 group-hover:rotate-6 transition-transform duration-500"><div className="relative w-12 h-12 flex items-center justify-center rounded-2xl p-1 bg-white/5 border border-white/10 overflow-hidden"><img src={brand.logoUrl} className="w-full h-full object-cover rounded-xl" alt="Logo" /></div></div>
+              <div className="flex-grow text-left z-10"><h3 className="text-[16px] font-black uppercase tracking-tight leading-tight">{brand.roletaTitle}</h3><p className="text-[12px] font-medium mt-1 opacity-60 text-gray-400">{brand.roletaTagline}</p></div>
+              <div className="flex-shrink-0 z-10 opacity-30 group-hover:opacity-100 transition-all transform group-hover:translate-x-2"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 5l7 7-7 7" /></svg></div>
             </a>
           )}
-
-          {/* LISTA DE LINKS NORMAIS */}
           {filteredLinks.map((link) => (
             <LinkButton key={link.id} link={link} />
           ))}
@@ -336,7 +319,7 @@ const App: React.FC = () => {
               </a>
             ))}
           </div>
-          <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.4em]">{brand.footerText?.split('ORDER:')[0] || `${brand.name} © 2025`}</p>
+          <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.4em]">{brand.footerText?.split('EXTRAS:')[0]?.split('ORDER:')[0] || `${brand.name} © 2025`}</p>
         </footer>
       </main>
     </div>

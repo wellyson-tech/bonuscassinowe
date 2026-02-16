@@ -22,6 +22,13 @@ export interface SocialLink {
   position: number;
 }
 
+export interface ExtraPageConfig {
+  title: string;
+  tagline: string;
+  effect: string;
+  badge: string;
+}
+
 export interface CasinoBrand {
   name: string;
   tagline: string;
@@ -30,10 +37,14 @@ export interface CasinoBrand {
   verified: boolean;
   footerText?: string;
   effect?: 'scanner' | 'gold-rain' | 'cyber-grid' | 'nebula' | 'matrix' | 'fire' | 'money' | 'space' | 'aurora' | 'glitch' | 'confetti' | 'snow' | 'lightning' | 'none';
-  // Novos campos para a Roleta/Sala VIP
   roletaTitle?: string;
   roletaTagline?: string;
   roletaLogoUrl?: string;
   roletaEffect?: string;
   roletaBadgeText?: string;
+  // Configurações para as novas páginas extras
+  extraPages?: {
+    bonusaleatorio?: ExtraPageConfig;
+    cinco_bonus?: ExtraPageConfig;
+  };
 }
