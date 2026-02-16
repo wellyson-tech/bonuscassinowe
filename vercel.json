@@ -1,0 +1,26 @@
+
+{
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/admin-secret",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/roleta",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/bonusaleatorio",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/5debonus",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/((?!api|_next|static|favicon.ico).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
