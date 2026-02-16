@@ -132,7 +132,7 @@ const App: React.FC = () => {
         ))}
 
         {effect === 'fire' && Array.from({ length: 40 }).map((_, i) => (
-          <div key={i} className="fire-ember" style={{ left: `${Math.random() * 100}%`, animationDuration: `${2 + Math.random() * 4}s`, animationDelay: `${Math.random() * 3}s`, width: `${2 + Math.random() * 4}px`, height: `${2 + Math.random() * 4}px` }} />
+          <div key={i} className="fire-ember" style={{ left: `${Math.random() * 100}%`, animationDuration: `${2 + Math.random() * 4}s`, animationDelay: `${Math.random() * 3}s` }} />
         ))}
 
         {effect === 'money' && Array.from({ length: 15 }).map((_, i) => (
@@ -197,8 +197,8 @@ const App: React.FC = () => {
         <BackgroundElements isRoleta={true} />
         <div className="fixed inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-900/20 via-transparent to-transparent -z-5 pointer-events-none"></div>
         
-        <main className="relative z-10 max-w-lg mx-auto px-6 py-16 flex flex-col items-center">
-          <header className="text-center mb-12 w-full flex flex-col items-center">
+        <main className="relative z-10 max-w-lg mx-auto px-6 py-16 flex flex-col items-center text-center">
+          <header className="mb-12 w-full flex flex-col items-center">
             <div className="relative mb-8">
               <div className="absolute inset-0 bg-purple-500/40 blur-[70px] rounded-full scale-110"></div>
               <div className="w-32 h-32 p-1 rounded-full bg-gradient-to-br from-purple-400 to-indigo-600 relative shadow-2xl overflow-hidden">
@@ -222,14 +222,19 @@ const App: React.FC = () => {
             ) : (
               <div className="glass-card p-10 rounded-[2rem] text-center border-dashed border-white/10 w-full">
                 <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Nenhuma mesa disponível</p>
+                <p className="text-[8px] mt-2 opacity-30">Crie links no admin com a categoria "Roleta"</p>
               </div>
             )}
           </div>
 
-          <a href="#/" className="text-[9px] font-black text-gray-600 hover:text-white uppercase tracking-[0.3em] flex items-center gap-2 transition-all">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            Voltar para Início
-          </a>
+          {/* BOTÃO VOLTAR FLUTUANTE NO CANTO DIREITO INFERIOR */}
+          <button 
+            onClick={() => { window.location.hash = '#/'; setView('public'); }} 
+            className="fixed bottom-6 right-6 z-[100] w-14 h-14 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 text-white rounded-full flex items-center justify-center shadow-[0_10px_30px_rgba(0,0,0,0.5)] transition-all active:scale-90 group"
+            title="Voltar para Início"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="group-hover:-translate-x-0.5 transition-transform"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          </button>
         </main>
       </div>
     );
@@ -272,6 +277,34 @@ const App: React.FC = () => {
         )}
 
         <div className={`w-full space-y-6 mb-16 transition-all duration-300 min-h-[400px] ${isTransitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
+          {/* BOTÃO ESPECIAL SALA VIP - APENAS EM 'LISTAS' */}
+          {activeCategory.trim().toLowerCase() === 'listas' && (
+            <a
+              href="#/roleta"
+              onClick={(e) => { e.preventDefault(); window.location.hash = '#/roleta'; setView('roleta'); }}
+              className="relative w-full p-5 rounded-[2.2rem] flex items-center gap-5 group overflow-hidden border-b-[6px] neon-purple-btn text-purple-100 transform hover:scale-[1.03] transition-all duration-300 shadow-xl"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none" />
+              <div className="flex-shrink-0 z-10 group-hover:rotate-6 transition-transform duration-500">
+                <div className="relative w-12 h-12 flex items-center justify-center rounded-2xl p-1 bg-white/5 border border-white/10 overflow-hidden shadow-inner">
+                  <img src={brand.logoUrl} className="w-full h-full object-cover rounded-xl" alt="Logo" />
+                </div>
+              </div>
+              <div className="flex-grow text-left z-10">
+                <h3 className="text-[16px] font-black uppercase tracking-tight leading-tight">{brand.roletaTitle}</h3>
+                <p className="text-[12px] font-medium mt-1 line-clamp-1 opacity-60 text-gray-400">
+                  {brand.roletaTagline}
+                </p>
+              </div>
+              <div className="flex-shrink-0 z-10 opacity-30 group-hover:opacity-100 transition-all transform group-hover:translate-x-2">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 5l7 7-7 7" />
+                </svg>
+              </div>
+            </a>
+          )}
+
+          {/* LISTA DE LINKS NORMAIS */}
           {filteredLinks.map((link) => (
             <LinkButton key={link.id} link={link} />
           ))}
