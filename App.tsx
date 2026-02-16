@@ -14,7 +14,7 @@ const App: React.FC = () => {
     ...DEFAULT_BRAND,
     extraPages: {
       bonusaleatorio: { title: 'BÔNUS SURPRESA', tagline: 'OFERTAS ALEATÓRIAS DO DIA', effect: 'money', badge: 'OFERTA LIMITADA' },
-      cinco_bonus: { title: 'R$ 5,00 GRÁS', tagline: 'PLATAFORMAS PAGANDO AGORA', effect: 'scanner', badge: 'SAQUE IMEDIATO' }
+      cinco_bonus: { title: 'R$ 5,00 GRÁTIS', tagline: 'PLATAFORMAS PAGANDO AGORA', effect: 'scanner', badge: 'SAQUE IMEDIATO' }
     }
   });
   const [activeCategory, setActiveCategory] = useState<string>('');
@@ -46,11 +46,8 @@ const App: React.FC = () => {
     const { data: { session } } = await supabase.auth.getSession();
     
     if (currentPath.includes('admin-secret')) {
-      if (session && session.user.id === ADMIN_UID) {
-        setView('admin');
-      } else {
-        setView('login');
-      }
+      if (session && session.user.id === ADMIN_UID) setView('admin');
+      else setView('login');
     } else if (currentPath === '/roleta') {
       setView('roleta');
     } else if (currentPath === '/bonusaleatorio') {
@@ -65,7 +62,6 @@ const App: React.FC = () => {
   useEffect(() => {
     const initApp = async () => {
       try {
-        // Observador de Auth para o Painel Admin não "sumir" após login
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
           if (session?.user?.id === ADMIN_UID && window.location.pathname.includes('admin-secret')) {
             setView('admin');
@@ -80,7 +76,7 @@ const App: React.FC = () => {
       } catch (e) {
         console.error("Erro na carga inicial:", e);
       } finally {
-        setTimeout(() => setInitializing(false), 800); // Delay suave para o loader
+        setTimeout(() => setInitializing(false), 800);
       }
     };
     initApp();
@@ -223,7 +219,6 @@ const App: React.FC = () => {
     setLoginLoading(false);
   };
 
-  // Loader de inicialização elegante
   if (initializing) return (
     <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-[9999]">
       <div className="w-20 h-20 relative animate-float">
