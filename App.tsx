@@ -7,7 +7,7 @@ import AdminPanel from './components/AdminPanel';
 import { CasinoLink, CasinoBrand, SocialLink } from './types';
 
 const App: React.FC = () => {
-  const [view, setView] = useState<'public' | 'login' | 'admin' | 'roleta'>('public');
+  const [view, setView] = useState<'public' | 'login' | 'admin' | 'roleta' | 'bonusaleatorio' | '5debonus'>('public');
   const [links, setLinks] = useState<CasinoLink[]>([]);
   const [socials, setSocials] = useState<SocialLink[]>([]);
   const [brand, setBrand] = useState<CasinoBrand>(DEFAULT_BRAND);
@@ -31,6 +31,10 @@ const App: React.FC = () => {
         else setView('login');
       } else if (hash === '#/roleta' || hash === '#roleta') {
         setView('roleta');
+      } else if (hash === '#/bonusaleatorio' || hash === '#bonusaleatorio') {
+        setView('bonusaleatorio');
+      } else if (hash === '#/5debonus' || hash === '#5debonus') {
+        setView('5debonus');
       } else {
         setView('public');
       }
@@ -97,7 +101,11 @@ const App: React.FC = () => {
     const foundCats: string[] = [];
     links.forEach(l => {
       const name = (l.category || 'Página 1').trim();
-      if (name.toLowerCase() !== 'roleta' && !foundCats.includes(name)) foundCats.push(name);
+      const lowerName = name.toLowerCase();
+      // Filtrar categorias especiais da lista de tabs da home
+      if (lowerName !== 'roleta' && lowerName !== 'bonus aleatorio' && lowerName !== '5 de bonus' && !foundCats.includes(name)) {
+        foundCats.push(name);
+      }
     });
     const ordered = pagesOrder.filter(c => foundCats.includes(c));
     foundCats.forEach(c => { if (!ordered.includes(c)) ordered.push(c); });
@@ -108,15 +116,11 @@ const App: React.FC = () => {
 
   const filteredLinks = useMemo(() => {
     const target = activeCategory || categories[0] || 'Página 1';
-    return links.filter(l => (l.category || 'Página 1').trim() === target.trim() && (l.category || '').toLowerCase() !== 'roleta');
+    return links.filter(l => (l.category || 'Página 1').trim() === target.trim());
   }, [links, activeCategory, categories]);
 
-  const roletaLinks = useMemo(() => {
-    return links.filter(l => (l.category || '').toLowerCase() === 'roleta');
-  }, [links]);
-
-  const BackgroundElements = ({ isRoleta = false }) => {
-    const effect = isRoleta ? (brand.roletaEffect || 'scanner') : (brand.effect || 'scanner');
+  const BackgroundElements = ({ customEffect }: { customEffect?: string }) => {
+    const effect = customEffect || brand.effect || 'scanner';
     return (
       <div className="effect-container fixed inset-0 pointer-events-none z-0">
         <div className="absolute inset-0 bg-black -z-30" />
@@ -125,7 +129,7 @@ const App: React.FC = () => {
                style={{ backgroundImage: `url(${brand.backgroundUrl})`, backgroundAttachment: 'fixed' }} />
         )}
         
-        {effect === 'scanner' && <div className="scanner-beam" style={isRoleta ? { background: 'linear-gradient(110deg, transparent, rgba(168, 85, 247, 0.15) 50%, transparent)' } : {}} />}
+        {effect === 'scanner' && <div className="scanner-beam" />}
         
         {effect === 'gold-rain' && Array.from({ length: 30 }).map((_, i) => (
           <div key={i} className="gold-particle" style={{ left: `${Math.random() * 100}%`, animationDuration: `${2 + Math.random() * 3}s`, animationDelay: `${Math.random() * 5}s` }} />
@@ -143,7 +147,7 @@ const App: React.FC = () => {
           <div key={i} className="star" style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%`, animationDuration: `${3 + Math.random() * 8}s` }} />
         ))}
 
-        {effect === 'aurora' && <div className="aurora-layer" style={isRoleta ? { background: 'linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.1), rgba(99, 102, 241, 0.1), transparent)' } : {}} />}
+        {effect === 'aurora' && <div className="aurora-layer" />}
         {effect === 'lightning' && <div className="lightning-flash animate-lightning" />}
         {effect === 'glitch' && Array.from({ length: 10 }).map((_, i) => (
           <div key={i} className="glitch-line" style={{ top: `${Math.random() * 100}%`, animationDelay: `${Math.random() * 2}s` }} />
@@ -153,6 +157,57 @@ const App: React.FC = () => {
         ))}
 
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/90 -z-10" />
+      </div>
+    );
+  };
+
+  const CategoryPageView = ({ categoryName, title, tagline }: { categoryName: string, title?: string, tagline?: string }) => {
+    const pageLinks = links.filter(l => (l.category || '').toLowerCase() === categoryName.toLowerCase());
+    
+    return (
+      <div className="min-h-screen bg-black text-white relative font-sans overflow-x-hidden pb-20">
+        <BackgroundElements customEffect={brand.roletaEffect} />
+        <div className="fixed inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-900/20 via-transparent to-transparent -z-5 pointer-events-none"></div>
+        
+        <main className="relative z-10 max-w-lg mx-auto px-6 py-16 flex flex-col items-center text-center">
+          <header className="mb-12 w-full flex flex-col items-center">
+            <div className="relative mb-8">
+              <div className="absolute inset-0 bg-purple-500/40 blur-[70px] rounded-full scale-110"></div>
+              <div className="w-32 h-32 p-1 rounded-full bg-gradient-to-br from-purple-400 to-indigo-600 relative shadow-2xl overflow-hidden">
+                <img src={brand.roletaLogoUrl || brand.logoUrl} className="w-full h-full rounded-full object-cover border-[5px] border-black" alt="Logo" />
+              </div>
+            </div>
+            <div className="inline-block px-4 py-1 rounded-full border border-purple-500/30 bg-purple-500/10 text-purple-400 text-[9px] font-black uppercase tracking-[0.4em] mb-4">
+              {brand.roletaBadgeText || 'Acesso Restrito'}
+            </div>
+            <h1 className="text-5xl font-black uppercase italic tracking-tighter text-shimmer leading-none mb-2">
+              {title || brand.roletaTitle}
+            </h1>
+            <h2 className="text-xl font-black uppercase italic tracking-tighter text-white opacity-70">
+              {tagline || brand.roletaTagline}
+            </h2>
+          </header>
+
+          <div className="w-full space-y-4 mb-16">
+            {pageLinks.length > 0 ? (
+              pageLinks.map(link => <LinkButton key={link.id} link={link} />)
+            ) : (
+              <div className="glass-card p-10 rounded-[2rem] text-center border-dashed border-white/10 w-full">
+                <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Nenhuma oferta disponível</p>
+                <p className="text-[8px] mt-2 opacity-30">Crie links no admin com a categoria "{categoryName}"</p>
+              </div>
+            )}
+          </div>
+
+          {/* BOTÃO VOLTAR FLUTUANTE NO CANTO DIREITO INFERIOR */}
+          <button 
+            onClick={() => { window.location.hash = '#/'; setView('public'); }} 
+            className="fixed bottom-6 right-6 z-[100] w-14 h-14 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 text-white rounded-full flex items-center justify-center shadow-[0_10px_30px_rgba(0,0,0,0.5)] transition-all active:scale-90 group"
+            title="Voltar para Início"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="group-hover:-translate-x-0.5 transition-transform"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          </button>
+        </main>
       </div>
     );
   };
@@ -192,52 +247,15 @@ const App: React.FC = () => {
   }
 
   if (view === 'roleta') {
-    return (
-      <div className="min-h-screen bg-black text-white relative font-sans overflow-x-hidden pb-20">
-        <BackgroundElements isRoleta={true} />
-        <div className="fixed inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-900/20 via-transparent to-transparent -z-5 pointer-events-none"></div>
-        
-        <main className="relative z-10 max-w-lg mx-auto px-6 py-16 flex flex-col items-center text-center">
-          <header className="mb-12 w-full flex flex-col items-center">
-            <div className="relative mb-8">
-              <div className="absolute inset-0 bg-purple-500/40 blur-[70px] rounded-full scale-110"></div>
-              <div className="w-32 h-32 p-1 rounded-full bg-gradient-to-br from-purple-400 to-indigo-600 relative shadow-2xl overflow-hidden">
-                <img src={brand.roletaLogoUrl || brand.logoUrl} className="w-full h-full rounded-full object-cover border-[5px] border-black" alt="Logo VIP" />
-              </div>
-            </div>
-            <div className="inline-block px-4 py-1 rounded-full border border-purple-500/30 bg-purple-500/10 text-purple-400 text-[9px] font-black uppercase tracking-[0.4em] mb-4">
-              {brand.roletaBadgeText}
-            </div>
-            <h1 className="text-5xl font-black uppercase italic tracking-tighter text-shimmer leading-none mb-2">
-              {brand.roletaTitle}
-            </h1>
-            <h2 className="text-xl font-black uppercase italic tracking-tighter text-white opacity-70">
-              {brand.roletaTagline}
-            </h2>
-          </header>
+    return <CategoryPageView categoryName="Roleta" />;
+  }
 
-          <div className="w-full space-y-4 mb-16">
-            {roletaLinks.length > 0 ? (
-              roletaLinks.map(link => <LinkButton key={link.id} link={link} />)
-            ) : (
-              <div className="glass-card p-10 rounded-[2rem] text-center border-dashed border-white/10 w-full">
-                <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Nenhuma mesa disponível</p>
-                <p className="text-[8px] mt-2 opacity-30">Crie links no admin com a categoria "Roleta"</p>
-              </div>
-            )}
-          </div>
+  if (view === 'bonusaleatorio') {
+    return <CategoryPageView categoryName="Bonus Aleatorio" title="BÔNUS SURPRESA" tagline="OFERTAS ALEATÓRIAS DO DIA" />;
+  }
 
-          {/* BOTÃO VOLTAR FLUTUANTE NO CANTO DIREITO INFERIOR */}
-          <button 
-            onClick={() => { window.location.hash = '#/'; setView('public'); }} 
-            className="fixed bottom-6 right-6 z-[100] w-14 h-14 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 text-white rounded-full flex items-center justify-center shadow-[0_10px_30px_rgba(0,0,0,0.5)] transition-all active:scale-90 group"
-            title="Voltar para Início"
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="group-hover:-translate-x-0.5 transition-transform"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-          </button>
-        </main>
-      </div>
-    );
+  if (view === '5debonus') {
+    return <CategoryPageView categoryName="5 de Bonus" title="R$ 5,00 GRÁTIS" tagline="PLATAFORMAS PAGANDO AGORA" />;
   }
 
   return (
