@@ -1,11 +1,5 @@
 
 {
   "cleanUrls": true,
-  "trailingSlash": false,
-  "rewrites": [
-    {
-      "source": "/((?!api|_next|static|favicon.ico).*)",
-      "destination": "/index.html"
-    }
-  ]
+  "trailingSlash": false
 }

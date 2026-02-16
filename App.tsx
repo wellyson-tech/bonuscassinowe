@@ -26,44 +26,47 @@ const App: React.FC = () => {
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  const getNormalizedPath = () => {
-    let path = window.location.pathname.toLowerCase();
-    if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
-    return path;
+  // Lógica de Hash Routing: detecta o que está após o /#/
+  const getNormalizedHash = () => {
+    let hash = window.location.hash.toLowerCase() || '#/';
+    if (hash.startsWith('#')) hash = hash.substring(1);
+    if (!hash.startsWith('/')) hash = '/' + hash;
+    return hash;
   };
 
   const navigateTo = (path: string) => {
-    try {
-      window.history.pushState({}, '', path);
-      handleNavigation();
-    } catch (e) {
-      window.location.href = path;
-    }
+    window.location.hash = path.startsWith('/') ? path : '/' + path;
   };
 
   const handleNavigation = async () => {
-    const currentPath = getNormalizedPath();
+    const currentHash = getNormalizedHash();
     const { data: { session } } = await supabase.auth.getSession();
     
-    if (currentPath.includes('admin-secret')) {
+    if (currentHash.includes('admin-secret')) {
       if (session && session.user.id === ADMIN_UID) setView('admin');
       else setView('login');
-    } else if (currentPath === '/roleta') {
+    } else if (currentHash === '/roleta') {
       setView('roleta');
-    } else if (currentPath === '/bonusaleatorio') {
+    } else if (currentHash === '/bonusaleatorio') {
       setView('bonusaleatorio');
-    } else if (currentPath === '/5debonus') {
+    } else if (currentHash === '/5debonus') {
       setView('5debonus');
     } else {
       setView('public');
     }
+    // Scroll para o topo em cada troca de "página"
+    window.scrollTo(0, 0);
   };
 
   useEffect(() => {
     const initApp = async () => {
       try {
+        // Escuta mudanças no Hash
+        window.addEventListener('hashchange', handleNavigation);
+        
+        // Observador de Auth para o Painel Admin
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-          if (session?.user?.id === ADMIN_UID && window.location.pathname.includes('admin-secret')) {
+          if (session?.user?.id === ADMIN_UID && getNormalizedHash().includes('admin-secret')) {
             setView('admin');
           }
         });
@@ -72,7 +75,10 @@ const App: React.FC = () => {
         await fetchBrand();
         await Promise.all([fetchLinks(), fetchSocials()]);
         
-        return () => subscription.unsubscribe();
+        return () => {
+          window.removeEventListener('hashchange', handleNavigation);
+          subscription.unsubscribe();
+        };
       } catch (e) {
         console.error("Erro na carga inicial:", e);
       } finally {
@@ -80,8 +86,6 @@ const App: React.FC = () => {
       }
     };
     initApp();
-    window.addEventListener('popstate', handleNavigation);
-    return () => window.removeEventListener('popstate', handleNavigation);
   }, []);
 
   const fetchBrand = async () => {
