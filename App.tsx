@@ -135,8 +135,8 @@ const App: React.FC = () => {
     return links.filter(l => (l.category || 'Página 1').trim() === target.trim());
   }, [links, activeCategory, categories]);
 
-  const BackgroundElements = ({ customEffect }: { customEffect?: string }) => {
-    const effect = customEffect || brand.effect || 'scanner';
+  const BackgroundElements = () => {
+    const effect = brand.effect || 'scanner';
     return (
       <div className="effect-container fixed inset-0 pointer-events-none z-0">
         <div className="absolute inset-0 bg-black -z-30" />
@@ -171,23 +171,22 @@ const App: React.FC = () => {
     );
   };
 
-  const CategoryPageView = ({ categoryName, title, tagline, effect, badge }: { categoryName: string, title?: string, tagline?: string, effect?: string, badge?: string }) => {
+  const CategoryPageView = ({ categoryName, title, tagline, badge }: { categoryName: string, title?: string, tagline?: string, effect?: string, badge?: string }) => {
     const pageLinks = links.filter(l => (l.category || '').toLowerCase() === categoryName.toLowerCase());
     
     return (
       <div className="min-h-screen bg-black text-white relative font-sans overflow-x-hidden pb-20">
-        <BackgroundElements customEffect={effect || brand.roletaEffect} />
-        <div className="fixed inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-900/20 via-transparent to-transparent -z-5 pointer-events-none"></div>
+        <BackgroundElements />
         
         <main className="relative z-10 max-w-lg mx-auto px-6 py-16 flex flex-col items-center text-center">
           <header className="mb-12 w-full flex flex-col items-center">
             <div className="relative mb-8">
-              <div className="absolute inset-0 bg-purple-500/40 blur-[70px] rounded-full scale-110"></div>
-              <div className="w-32 h-32 p-1 rounded-full bg-gradient-to-br from-purple-400 to-indigo-600 relative shadow-2xl overflow-hidden">
+              <div className="absolute inset-0 bg-yellow-500/30 blur-[70px] rounded-full scale-110"></div>
+              <div className="w-32 h-32 p-1 rounded-full bg-gradient-to-br from-yellow-200 via-yellow-600 to-yellow-300 relative shadow-2xl overflow-hidden">
                 <img src={brand.roletaLogoUrl || brand.logoUrl} className="w-full h-full rounded-full object-cover border-[5px] border-black" alt="Logo" />
               </div>
             </div>
-            <div className="inline-block px-4 py-1 rounded-full border border-purple-500/30 bg-purple-500/10 text-purple-400 text-[9px] font-black uppercase tracking-[0.4em] mb-4">
+            <div className="inline-block px-4 py-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 text-yellow-500 text-[9px] font-black uppercase tracking-[0.4em] mb-4">
               {badge || brand.roletaBadgeText || 'Acesso Restrito'}
             </div>
             <h1 className="text-5xl font-black uppercase italic tracking-tighter text-shimmer leading-none mb-2">
@@ -254,12 +253,12 @@ const App: React.FC = () => {
   
   if (view === 'bonusaleatorio') {
     const cfg = brand.extraPages?.bonusaleatorio;
-    return <CategoryPageView categoryName="Bonus Aleatorio" title={cfg?.title} tagline={cfg?.tagline} effect={cfg?.effect} badge={cfg?.badge} />;
+    return <CategoryPageView categoryName="Bonus Aleatorio" title={cfg?.title} tagline={cfg?.tagline} badge={cfg?.badge} />;
   }
 
   if (view === '5debonus') {
     const cfg = brand.extraPages?.cinco_bonus;
-    return <CategoryPageView categoryName="5 de Bonus" title={cfg?.title} tagline={cfg?.tagline} effect={cfg?.effect} badge={cfg?.badge} />;
+    return <CategoryPageView categoryName="5 de Bonus" title={cfg?.title} tagline={cfg?.tagline} badge={cfg?.badge} />;
   }
 
   return (
