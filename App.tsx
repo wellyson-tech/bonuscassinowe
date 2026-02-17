@@ -54,7 +54,8 @@ const App: React.FC = () => {
       } catch (e) {
         console.error("Erro na inicialização:", e);
       } finally {
-        setInitializing(false);
+        // Delay opcional para garantir que o loader seja visto e a transição seja suave
+        setTimeout(() => setInitializing(false), 800);
       }
     };
 
@@ -232,7 +233,27 @@ const App: React.FC = () => {
     setLoginLoading(false);
   };
 
-  if (initializing) return null;
+  if (initializing) return (
+    <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-[9999]">
+      <div className="w-20 h-20 relative animate-pulse">
+        <img src={brand.logoUrl || DEFAULT_BRAND.logoUrl} className="w-full h-full rounded-full object-cover border-4 border-yellow-500 shadow-[0_0_30px_rgba(234,179,8,0.3)]" alt="Logo" />
+      </div>
+      <div className="mt-8 flex flex-col items-center gap-2">
+        <div className="w-32 h-1 bg-white/5 rounded-full overflow-hidden">
+          <div className="h-full bg-yellow-500 animate-[loading_1.5s_infinite_ease-in-out]"></div>
+        </div>
+        <p className="text-[8px] font-black uppercase tracking-[0.4em] text-yellow-500/50">Carregando plataformas</p>
+      </div>
+      <style>{`
+        @keyframes loading {
+          0% { width: 0; transform: translateX(-100%); }
+          50% { width: 100%; transform: translateX(0); }
+          100% { width: 0; transform: translateX(100%); }
+        }
+      `}</style>
+    </div>
+  );
+
   if (view === 'admin') return <AdminPanel />;
   if (view === 'login') return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-black relative overflow-hidden">
