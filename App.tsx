@@ -171,7 +171,7 @@ const App: React.FC = () => {
     );
   };
 
-  const CategoryPageView = ({ categoryName, title, tagline, badge }: { categoryName: string, title?: string, tagline?: string, effect?: string, badge?: string }) => {
+  const CategoryPageView = ({ categoryName, title, tagline, badge }: { categoryName: string, title?: string, tagline?: string, badge?: string }) => {
     const pageLinks = links.filter(l => (l.category || '').toLowerCase() === categoryName.toLowerCase());
     
     return (
